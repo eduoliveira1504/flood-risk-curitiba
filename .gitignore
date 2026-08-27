@@ -1,0 +1,125 @@
+# ---------- Dados ----------
+# Nenhum dado bruto ou processado vai para o repositório.
+data/
+!data/.gitkeep
+!data/**/.gitkeep
+!data/**/README.md
+
+# Rasters e vetores geoespaciais
+*.tif
+*.tiff
+*.jp2
+*.img
+*.hdf
+*.nc
+*.grib
+*.grib2
+*.safe/
+*.SAFE/
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.sbn
+*.sbx
+*.gpkg
+*.geojson
+*.kml
+*.kmz
+
+# Tabelas volumosas
+*.csv
+*.parquet
+*.feather
+*.h5
+*.hdf5
+!examples/*.csv
+!reports/**/*.csv
+
+# ---------- Modelos e experimentos ----------
+models/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.pkl
+*.joblib
+mlruns/
+mlartifacts/
+lightning_logs/
+runs/
+wandb/
+
+# ---------- Credenciais ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
+secrets.yaml
+sentinelhub_config.json
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+.conda/
+
+# Testes e cobertura
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+
+# ---------- Jupyter ----------
+.ipynb_checkpoints/
+profile_default/
+ipython_config.py
+
+# ---------- Streamlit ----------
+.streamlit/secrets.toml
+
+# ---------- IDEs e sistema ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- Saídas temporárias ----------
+tmp/
+temp/
+cache/
+*.log

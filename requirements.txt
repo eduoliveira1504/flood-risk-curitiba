@@ -1,0 +1,34 @@
+# Núcleo
+numpy
+pandas
+scikit-learn
+python-dotenv
+
+# Geoprocessamento
+rasterio
+geopandas
+shapely
+pyproj
+richdem
+
+# Sensoriamento remoto e APIs
+sentinelhub
+requests
+
+# Deep Learning
+torch
+torchvision
+segmentation-models-pytorch
+
+# Experimentos
+mlflow
+
+# Visualização
+matplotlib
+folium
+streamlit
+streamlit-folium
+
+# Desenvolvimento
+jupyter
+ruff
