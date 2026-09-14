@@ -1,0 +1,221 @@
+# ---------------------------------------------------------------------------
+# flood-risk-curitiba — configuração central do pipeline
+#
+# Este arquivo é a ÚNICA fonte de verdade para parâmetros espaciais, temporais
+# e de modelagem. Nenhum número mágico deve aparecer no código.
+# Sobrescreva pontualmente com: --config configs/experimento_x.yaml
+# ---------------------------------------------------------------------------
+
+project:
+  name: flood-risk-curitiba
+  # WGS84 para entrada/saída de dados públicos e mapas web.
+  crs_geo: EPSG:4326
+  # SIRGAS 2000 / UTM 22S — CRS métrico oficial brasileiro para Curitiba.
+  # Toda operação de área, distância, buffer e declividade acontece aqui.
+  crs_metric: EPSG:31982
+  random_seed: 42
+
+aoi:
+  # Bounding box do município de Curitiba em WGS84 [oeste, sul, leste, norte].
+  # Usado como fallback e para consulta às APIs de satélite.
+  bbox: [-49.3960, -25.6560, -49.1840, -25.3440]
+  # Limite municipal oficial (IBGE / Dados Abertos Curitiba). Quando presente,
+  # tem precedência sobre a bbox no recorte final dos rasters.
+  boundary_file: data/raw/limites/curitiba_municipio.geojson
+
+boundary:
+  # Malha municipal oficial, API de malhas do IBGE (v3). Acesso público, sem chave.
+  source: ibge
+  municipality_code: "4106902"   # Curitiba
+  url: "https://servicodados.ibge.gov.br/api/v3/malhas/municipios/4106902?formato=application/vnd.geo+json&qualidade=maxima"
+  # O IBGE publica em SIRGAS 2000 geográfico. A diferença para WGS84 é submétrica.
+  source_crs: EPSG:4674
+  # Área oficial do município. Serve de rede de segurança: se o download vier com
+  # outro município, parcial, ou a API mudar de contrato, a área denuncia e o
+  # estágio falha em vez de gravar um polígono errado em silêncio.
+  expected_area_km2: 435.0
+  area_tolerance_pct: 10.0
+  request_timeout_s: 60
+  max_retries: 3
+
+raster:
+  # Resolução nativa das bandas visíveis/NIR do Sentinel-2.
+  resolution_m: 10
+  # Patches de treino da U-Net.
+  patch_size: 256
+  patch_overlap: 32
+  # Descarta patches com menos que esta fração de pixels válidos (nodata/nuvem).
+  min_valid_fraction: 0.90
+
+grid:
+  # Célula de agregação zonal dos resultados (mapa de suscetibilidade).
+  cell_size_m: 200
+
+sentinel:
+  # Copernicus Data Space Ecosystem — serviço GRATUITO da ESA.
+  # NÃO confundir com apps.sentinel-hub.com, que é o comercial com trial expirável.
+  # Credenciais no .env: CDSE_CLIENT_ID / CDSE_CLIENT_SECRET.
+  # Cota do plano gratuito: 10.000 PU/mês, 10.000 req/mês, 300 req/min.
+  collection: sentinel-2-l2a
+  base_url: https://sh.dataspace.copernicus.eu
+  token_url: https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token
+  # CRS DA REQUISIÇÃO — não confundir com project.crs_metric.
+  # O Process API só aceita WGS84, Pseudo-Mercator e zonas UTM WGS84; pedir em
+  # SIRGAS 2000 (EPSG:31982) devolve "Unsupported CRS value".
+  # Então a aquisição acontece em WGS84 / UTM 22S e o mosaico é reprojetado uma
+  # única vez para o CRS de análise. A diferença entre os dois data em território
+  # brasileiro é de poucos centímetros, muito abaixo do pixel de 10 m.
+  request_crs: EPSG:32722
+  # Janela de composição.
+  #
+  # CUIDADO: requisição multi-temporal é cobrada POR CENA. O custo em processing
+  # units é linear no número de datas desta janela, então dobrar o período dobra
+  # a conta. Um ano rende ~24 datas com nuvem < 20% sobre Curitiba, o que já é
+  # amostra suficiente para uma mediana estável de impermeabilidade — superfície
+  # construída não muda de mês para mês.
+  # Rode `probe-sentinel` depois de mexer aqui: ele recalcula o custo.
+  date_start: "2024-01-01"
+  date_end: "2024-12-31"
+  max_cloud_cover: 20
+  bands: [B02, B03, B04, B08]
+  # Mediana temporal: robusta a nuvem residual e sombra.
+  composite: median
+  # Lado do tile de requisição, em pixels. O Process API recusa saída acima de
+  # 2500 px por lado, então a cidade é pedida em pedaços e costurada localmente.
+  request_tile_px: 2048
+  # Classes da Scene Classification Layer descartadas antes da mediana:
+  # 0 nodata · 1 saturado · 3 sombra de nuvem · 8 nuvem média · 9 nuvem alta
+  # 10 cirrus · 11 neve. Mantém 2 (área escura), 4 (vegetação),
+  # 5 (não vegetado), 6 (água) e 7 (não classificado) — é em 5 e 7 que a
+  # superfície impermeável costuma cair.
+  invalid_scl_classes: [0, 1, 3, 8, 9, 10, 11]
+  # Teto de processing units por execução do acquire-sentinel. A cota do plano
+  # gratuito é 10.000 PU/mês; este limite deixa margem para refazer o download
+  # depois de um erro sem perder o mês. `acquire-sentinel` se recusa a rodar se
+  # a estimativa passar daqui.
+  max_processing_units: 2000
+
+ground_truth:
+  # Máscara binária de superfície impermeável = OSM (vias) OR WorldCover(50).
+  worldcover:
+    # Bucket público da ESA na AWS, acesso anônimo. Lido por janela via /vsicurl:
+    # o tile cobre 3° x 3° e pesa centenas de MB, mas só o AOI é transferido.
+    year: 2021
+    version: v200
+    builtup_class: 50   # "built-up" na legenda do WorldCover
+    url_template: "https://esa-worldcover.s3.eu-central-1.amazonaws.com/{version}/{year}/map/ESA_WorldCover_10m_{year}_{version}_{tile}_Map.tif"
+    tile_size_deg: 3
+  osm:
+    # Buffer hierárquico por tipo de via, em metros (meia-largura da pista).
+    road_buffers_m:
+      motorway: 12.0
+      trunk: 10.0
+      primary: 9.0
+      secondary: 7.0
+      tertiary: 6.0
+      residential: 5.0
+      unclassified: 4.5
+      service: 4.0
+      living_street: 4.0
+
+terrain:
+  # DEM base para declividade e acúmulo de fluxo.
+  # Copernicus GLO-30 (30 m) — cobertura global, licença aberta.
+  dem_source: copernicus-glo-30
+  slope_units: degrees
+  # Reamostragem do DEM para a grade de 10 m antes do cálculo de declividade.
+  resample_to_resolution: true
+
+occurrences:
+  # ALVO SUPERVISIONADO — fonte ainda a definir (ver Fase 1).
+  # Candidatos: chamados 156 da Prefeitura, Defesa Civil PR, CEMADEN.
+  source: null
+  path: data/raw/ocorrencias/alagamentos.geojson
+  date_field: data_ocorrencia
+  # Raio de incerteza posicional do registro (endereço → ponto).
+  positional_tolerance_m: 100
+
+forecast:
+  # Open-Meteo. Uso não-comercial: sem API key. Licença CC-BY 4.0 — a atribuição
+  # abaixo é OBRIGATÓRIA e precisa aparecer visível no site publicado.
+  # Limites do plano gratuito: 600/min, 5.000/h, 10.000/dia.
+  provider: open-meteo
+  forecast_endpoint: https://api.open-meteo.com/v1/forecast
+  archive_endpoint: https://archive-api.open-meteo.com/v1/archive
+  timezone: America/Sao_Paulo
+  # Horizonte exibido no site. Open-Meteo entrega até 16 dias (384 h).
+  horizon_hours: 48
+  # Centroide aproximado de Curitiba. A célula do modelo tem 9–11 km, então não
+  # existe informação intraurbana a extrair: a chuva entra como valor da cidade.
+  reference_point:
+    lat: -25.4284
+    lon: -49.2733
+  # Janela de acumulado usada para escolher o cenário de chuva.
+  accumulation_window_h: 6
+  attribution: "Dados meteorológicos: Open-Meteo.com (CC-BY 4.0)"
+  request_timeout_s: 30
+  max_retries: 3
+
+risk_scenarios:
+  # Patamares de acumulado (em mm, na janela forecast.accumulation_window_h) que
+  # selecionam qual camada de risco pré-materializada o site exibe.
+  #
+  # ATENÇÃO: os valores abaixo são PROVISÓRIOS e não podem ir para a defesa assim.
+  # Precisam de justificativa — Lohmann & Santos (2021) determinaram padrões de
+  # chuva crítica para alagamento especificamente em Curitiba, com acumulado a
+  # cada 6 h, e é de lá que os cortes devem sair.
+  justification_pending: true
+  tiers:
+    - name: leve
+      min_mm: 0.0
+      label: "Chuva leve"
+    - name: forte
+      min_mm: 20.0
+      label: "Chuva forte"
+    - name: critica
+      min_mm: 40.0
+      label: "Chuva crítica"
+
+split:
+  # Split espacial em blocos: tiles vizinhos vazam contexto e inflam a métrica.
+  strategy: spatial_block
+  block_size_m: 2000
+  fractions:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+
+model:
+  arch: unet
+  encoder: resnet34
+  encoder_weights: imagenet
+  in_channels: 4
+  classes: 1
+  loss:
+    bce_weight: 0.5
+    dice_weight: 0.5
+  optimizer: adamw
+  learning_rate: 1.0e-3
+  weight_decay: 1.0e-4
+  batch_size: 16
+  max_epochs: 100
+  early_stopping_patience: 15
+  scheduler: reduce_on_plateau
+
+evaluation:
+  # Limiar mínimo declarado no documento do TCC.
+  dice_threshold: 0.75
+  binarization_threshold: 0.5
+
+tracking:
+  mlflow_uri: sqlite:///mlruns.db
+  experiment_name: flood-risk-curitiba
+
+paths:
+  data_raw: data/raw
+  data_interim: data/interim
+  data_processed: data/processed
+  models: models
+  reports: reports
+  figures: reports/figures
+  logs: logs

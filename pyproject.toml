@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "floodrisk"
+version = "0.1.0"
+description = "Mapeamento de suscetibilidade a alagamentos urbanos em Curitiba"
+requires-python = ">=3.11"
+readme = "README.md"
+
+# Dependências do núcleo: tudo que os estágios das Fases 0-2 precisam.
+# `pip install -e .` sozinho já deixa o pipeline rodando até a montagem do dataset.
+dependencies = [
+    "numpy",
+    "pandas",
+    "scikit-learn",
+    "python-dotenv",
+    "pyyaml",
+    "requests",
+    "rasterio",
+    "geopandas",
+    "shapely",
+    "pyproj",
+    "sentinelhub",
+    "matplotlib",
+    "folium",
+]
+
+[project.optional-dependencies]
+# Deliberadamente FORA do núcleo: a RTX 5060 é Blackwell (sm_120) e exige build
+# com CUDA 12.8. Instalar torch do índice padrão do PyPI traz um build que não
+# reconhece a placa e falha só na hora do treino. Instale assim:
+#
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#   pip install -e ".[dl]"
+#
+dl = [
+    "torch>=2.7",
+    "torchvision",
+    "segmentation-models-pytorch",
+    "mlflow",
+]
+
+# richdem não tem wheel para toda combinação de SO e versão de Python, e uma
+# falha de compilação aqui derrubaria a instalação inteira. Fica isolado.
+terrain = ["richdem"]
+
+dev = [
+    "pytest",
+    "ruff",
+    "jupyter",
+]
+
+[project.scripts]
+floodrisk = "floodrisk.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # acentuação em docstrings/strings pt-BR
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+filterwarnings = [
+    "error",
+    # Deprecação interna do rasterio (Affine `*` vs `@`), não do nosso código.
+    "ignore:Use `@` matmul instead:PendingDeprecationWarning",
+]

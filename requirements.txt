@@ -1,34 +1,17 @@
-# Núcleo
-numpy
-pandas
-scikit-learn
-python-dotenv
+# As dependências reais vivem em pyproject.toml — este arquivo só aponta para lá,
+# para que `pip install -r requirements.txt` continue funcionando.
+#
+# Instalação completa, em ordem:
+#
+#   1. Núcleo + ferramentas de desenvolvimento
+#      pip install -e ".[dev]"
+#
+#   2. Deep Learning — ATENÇÃO à RTX 5060 (Blackwell, sm_120), que exige CUDA 12.8.
+#      O índice padrão do PyPI traz um build que não reconhece a placa.
+#      pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+#      pip install -e ".[dl]"
+#
+#   3. Derivação de terreno (só na Fase 2)
+#      pip install -e ".[terrain]"
 
-# Geoprocessamento
-rasterio
-geopandas
-shapely
-pyproj
-richdem
-
-# Sensoriamento remoto e APIs
-sentinelhub
-requests
-
-# Deep Learning
-torch
-torchvision
-segmentation-models-pytorch
-
-# Experimentos
-mlflow
-
-# Visualização
-matplotlib
-folium
-streamlit
-streamlit-folium
-
-# Desenvolvimento
-jupyter
-ruff
+-e .[dev]
