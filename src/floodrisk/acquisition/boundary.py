@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["BoundaryError", "acquire", "fetch_boundary", "validate_area"]
 
-_USER_AGENT = "flood-risk-curitiba/0.1 (TCC FAE Centro Universitário; academic use)"
+_USER_AGENT = "flood-risk-curitiba/0.1 (TCC, FAE Centro Universitario, Curitiba BR; academic use)"
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})
 
 SQUARE_METRES_PER_KM2 = 1_000_000.0

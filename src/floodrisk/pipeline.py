@@ -70,6 +70,20 @@ def _stage_acquire_sentinel(config: Config) -> None:
     sentinel.acquire(config)
 
 
+def _stage_acquire_osm(config: Config) -> None:
+    """Baixa a malha viária do OpenStreetMap via Overpass."""
+    from .acquisition import osm
+
+    osm.acquire(config)
+
+
+def _stage_acquire_streets(config: Config) -> None:
+    """Baixa a malha viária oficial do município (GeoCuritiba / IPPUC)."""
+    from .acquisition import streets
+
+    streets.acquire(config)
+
+
 def _stage_acquire_worldcover(config: Config) -> None:
     """Recorta o ESA WorldCover na grade do mosaico Sentinel-2."""
     from .acquisition import worldcover
@@ -77,11 +91,53 @@ def _stage_acquire_worldcover(config: Config) -> None:
     worldcover.acquire(config)
 
 
+def _stage_acquire_dem(config: Config) -> None:
+    """Recorta o Copernicus DEM GLO-30 na grade de referência."""
+    from .acquisition import dem
+
+    dem.acquire(config)
+
+
+def _stage_build_terrain(config: Config) -> None:
+    """Deriva a declividade do DEM pelo método de Horn."""
+    from .features import terrain
+
+    terrain.build(config)
+
+
 def _stage_acquire_forecast(config: Config) -> None:
     """Busca a previsão da Open-Meteo e grava o snapshot de fallback do site."""
     from .acquisition import forecast
 
     forecast.acquire(config)
+
+
+def _stage_build_mask(config: Config) -> None:
+    """Une WorldCover e vias do OSM na máscara de impermeabilidade."""
+    from .features import mask
+
+    mask.build(config)
+
+
+def _stage_make_dataset(config: Config) -> None:
+    """Recorta os patches de treino e aplica o split espacial em blocos."""
+    from .features import dataset
+
+    dataset.build(config)
+
+
+def _stage_train(config: Config) -> None:
+    """Treina a U-Net de segmentação de superfície impermeável."""
+    from .model import train
+
+    train.run(config)
+
+
+def _stage_evaluate(config: Config) -> None:
+    """Gasta o conjunto de teste e escreve o relatório de métricas."""
+    from .model import evaluate
+
+    evaluate.run(config)
 
 
 def _stage_info(config: Config) -> None:
@@ -143,14 +199,30 @@ STAGES: tuple[Stage, ...] = (
         "Baixa e compõe o mosaico Sentinel-2 (mediana)",
         _stage_acquire_sentinel,
     ),
-    Stage("acquire-osm", 1, "Baixa a malha viária do OpenStreetMap"),
+    Stage(
+        "acquire-streets",
+        1,
+        "Baixa a malha viária oficial do município (GeoCuritiba/IPPUC)",
+        _stage_acquire_streets,
+    ),
+    Stage(
+        "acquire-osm",
+        1,
+        "Malha viária do OpenStreetMap (alternativa ao acquire-streets)",
+        _stage_acquire_osm,
+    ),
     Stage(
         "acquire-worldcover",
         1,
         "Recorta o ESA WorldCover na grade de referência",
         _stage_acquire_worldcover,
     ),
-    Stage("acquire-dem", 1, "Baixa e recorta o DEM base"),
+    Stage(
+        "acquire-dem",
+        1,
+        "Baixa e recorta o Copernicus DEM GLO-30",
+        _stage_acquire_dem,
+    ),
     Stage("acquire-occurrences", 1, "Coleta e geocodifica ocorrências de alagamento"),
     Stage(
         "acquire-forecast",
@@ -159,12 +231,37 @@ STAGES: tuple[Stage, ...] = (
         _stage_acquire_forecast,
     ),
     # -- Fase 2: preparo --------------------------------------------------- #
-    Stage("build-mask", 2, "Monta a máscara de impermeabilidade (OSM ∪ WorldCover)"),
-    Stage("build-terrain", 2, "Deriva declividade e acúmulo de fluxo do DEM"),
-    Stage("make-dataset", 2, "Recorta patches de treino e aplica o split espacial"),
+    Stage(
+        "build-mask",
+        2,
+        "Monta a máscara de impermeabilidade (OSM ∪ WorldCover)",
+        _stage_build_mask,
+    ),
+    Stage(
+        "build-terrain",
+        2,
+        "Deriva a declividade do DEM (Horn 3x3)",
+        _stage_build_terrain,
+    ),
+    Stage(
+        "make-dataset",
+        2,
+        "Recorta patches de treino e aplica o split espacial em blocos",
+        _stage_make_dataset,
+    ),
     # -- Fase 3: modelagem ------------------------------------------------- #
-    Stage("train", 3, "Treina a U-Net de segmentação"),
-    Stage("evaluate", 3, "Calcula Dice, IoU, matriz de confusão e Grad-CAM"),
+    Stage(
+        "train",
+        3,
+        "Treina a U-Net de segmentação de superfície impermeável",
+        _stage_train,
+    ),
+    Stage(
+        "evaluate",
+        3,
+        "Gasta o conjunto de teste: Dice, IoU, matriz de confusão e figura de erros",
+        _stage_evaluate,
+    ),
     Stage("infer", 3, "Aplica o modelo à cidade inteira"),
     # -- Fase 4: produto --------------------------------------------------- #
     Stage("susceptibility", 4, "Compõe o índice de suscetibilidade na grade zonal"),

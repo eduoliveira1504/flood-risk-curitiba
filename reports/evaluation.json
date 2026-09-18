@@ -1,0 +1,72 @@
+{
+  "checkpoint_epoch": 60,
+  "encoder": "resnet34",
+  "fixed_threshold": 0.5,
+  "patch_size": 128,
+  "test": {
+    "fixed": {
+      "accuracy": 0.9383010864257812,
+      "dice": 0.9311989957244556,
+      "false_negative": 27572.0,
+      "false_positive": 45211.0,
+      "iou": 0.8712557267436718,
+      "positive_rate": 0.44091033935546875,
+      "precision": 0.9159268667318756,
+      "recall": 0.946989054427929,
+      "specificity": 0.9314495647651582,
+      "threshold": 0.5,
+      "true_negative": 614318.0,
+      "true_positive": 492547.0,
+      "valid_pixels": 1179648.0
+    },
+    "tuned": {
+      "accuracy": 0.9382222493489584,
+      "dice": 0.9311886844117953,
+      "false_negative": 27022.0,
+      "false_positive": 45854.0,
+      "iou": 0.8712376738819696,
+      "positive_rate": 0.44091033935546875,
+      "precision": 0.9149199092310804,
+      "recall": 0.948046504742184,
+      "specificity": 0.9304746265895814,
+      "threshold": 0.49,
+      "true_negative": 613675.0,
+      "true_positive": 493097.0,
+      "valid_pixels": 1179648.0
+    }
+  },
+  "tuned_on": "val",
+  "tuned_threshold": 0.49,
+  "validation": {
+    "fixed": {
+      "accuracy": 0.9395351722592213,
+      "dice": 0.9271107487220559,
+      "false_negative": 25483.0,
+      "false_positive": 34947.0,
+      "iou": 0.8641253024184482,
+      "positive_rate": 0.4100371814164959,
+      "precision": 0.9166469893742621,
+      "recall": 0.9378161595506112,
+      "specificity": 0.9407299240362061,
+      "threshold": 0.5,
+      "true_negative": 554676.0,
+      "true_positive": 384318.0,
+      "valid_pixels": 999424.0
+    },
+    "tuned": {
+      "accuracy": 0.9394901463242827,
+      "dice": 0.9271435576111038,
+      "false_negative": 25010.0,
+      "false_positive": 35465.0,
+      "iou": 0.8641823090018101,
+      "positive_rate": 0.4100371814164959,
+      "precision": 0.9156109609380949,
+      "recall": 0.9389703783055678,
+      "specificity": 0.9398513965703509,
+      "threshold": 0.49,
+      "true_negative": 554158.0,
+      "true_positive": 384791.0,
+      "valid_pixels": 999424.0
+    }
+  }
+}

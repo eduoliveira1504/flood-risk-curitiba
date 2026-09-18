@@ -42,8 +42,15 @@ raster:
   # Resolução nativa das bandas visíveis/NIR do Sentinel-2.
   resolution_m: 10
   # Patches de treino da U-Net.
-  patch_size: 256
-  patch_overlap: 32
+  #
+  # 128 px = 1.280 m de lado. Com 256 px a bbox de Curitiba rende ~150 patches,
+  # e depois do split espacial (que descarta quem cruza divisa de bloco) sobram
+  # ~20 para teste — amostra pequena demais para uma métrica defensável. Com
+  # 128 px o mesmo território rende ~4x mais amostras sem mudar um pixel do
+  # dado, e o bloco do split cabe com folga em torno do patch.
+  # 128 é divisível por 32, que é o fator de subamostragem do encoder ResNet34.
+  patch_size: 128
+  patch_overlap: 16
   # Descarta patches com menos que esta fração de pixels válidos (nodata/nuvem).
   min_valid_fraction: 0.90
 
@@ -96,7 +103,50 @@ sentinel:
   max_processing_units: 2000
 
 ground_truth:
-  # Máscara binária de superfície impermeável = OSM (vias) OR WorldCover(50).
+  # Máscara binária de superfície impermeável = vias OR WorldCover(50).
+  #
+  # Fonte das vias: 'geocuritiba' (cadastro oficial do município, padrão) ou
+  # 'osm' (OpenStreetMap via Overpass, mantido como alternativa). O build-mask
+  # lê esta chave e não precisa saber de onde as vias vieram.
+  roads_source: geocuritiba
+
+  streets:
+    # GeoCuritiba / IPPUC — serviço ArcGIS REST da Prefeitura de Curitiba.
+    # Escolhido sobre o OSM por três motivos: é o cadastro OFICIAL do município,
+    # já vem em EPSG:31982 (nosso CRS de análise, zero reprojeção) e não depende
+    # de servidor voluntário com limite de taxa.
+    source: geocuritiba
+    service_url: "https://geocuritiba.ippuc.org.br/server/rest/services/GeoCuritiba/Publico_GeoCuritiba_MapaCadastral/MapServer"
+    layer_id: 11
+    layer_name: "Trecho Logradouro"
+    source_crs: EPSG:31982
+    out_fields: [objectid, gtm_nm_logradouro, hierarquia_viaria, sist_viario_classificado]
+    hierarchy_field: hierarquia_viaria
+    # Sem ordem estável, resultOffset pode repetir e pular feições entre páginas.
+    order_by_field: objectid
+    page_size: 2000          # teto do serviço
+    max_pages: 200           # trava contra laço infinito na paginação
+    request_timeout_s: 120
+    max_retries: 3
+    # Meia-largura da pista, em metros, por valor de hierarquia viária.
+    #
+    # O serviço não publica o domínio dos códigos, mas a distribuição de extensão
+    # medida no dado é conclusiva quanto à ORDEM (1 = via de maior hierarquia,
+    # 4 = via local):
+    #   1 -> 84 km · 2 -> 94 km · 3 -> 583 km · 4 -> 3.861 km
+    # As larguras abaixo são estimativas típicas por categoria, não medidas.
+    #
+    # MEDIDO: calibrar isto muda pouco o rótulo. A malha viária acrescenta ~0,9
+    # ponto percentual sobre o WorldCover sozinho, porque o WorldCover já captura
+    # cerca de 5/6 das vias em área urbana consolidada. Os buffers estão certos
+    # por correção, não por impacto.
+    default_buffer_m: 4.5
+    hierarchy_buffers_m:
+      "1": 15.0   # estrutural / via rápida
+      "2": 10.0   # prioritária / arterial
+      "3": 7.0    # coletora
+      "4": 4.5    # local
+
   worldcover:
     # Bucket público da ESA na AWS, acesso anônimo. Lido por janela via /vsicurl:
     # o tile cobre 3° x 3° e pesa centenas de MB, mas só o AOI é transferido.
@@ -106,7 +156,21 @@ ground_truth:
     url_template: "https://esa-worldcover.s3.eu-central-1.amazonaws.com/{version}/{year}/map/ESA_WorldCover_10m_{year}_{version}_{tile}_Map.tif"
     tile_size_deg: 3
   osm:
+    # Espelhos do Overpass, tentados em ordem. O overpass-api.de passou a filtrar
+    # tráfego programático e devolve HTTP 406 de forma persistente, então ele fica
+    # por último: insistir nele não resolve, trocar de espelho resolve.
+    # A resposta crua fica em data/raw/osm/, então repetir o estágio não bate no
+    # servidor de novo.
+    overpass_urls:
+      - https://overpass.kumi.systems/api/interpreter
+      - https://lz4.overpass-api.de/api/interpreter
+      - https://z.overpass-api.de/api/interpreter
+      - https://overpass.private.coffee/api/interpreter
+      - https://overpass-api.de/api/interpreter
+    request_timeout_s: 300
+    max_retries: 3
     # Buffer hierárquico por tipo de via, em metros (meia-largura da pista).
+    # Esta lista tem papel duplo: define a largura E filtra o que é baixado.
     road_buffers_m:
       motorway: 12.0
       trunk: 10.0
@@ -119,12 +183,20 @@ ground_truth:
       living_street: 4.0
 
 terrain:
-  # DEM base para declividade e acúmulo de fluxo.
-  # Copernicus GLO-30 (30 m) — cobertura global, licença aberta.
+  # Copernicus DEM GLO-30 — 30 m, cobertura global, licença aberta, bucket
+  # público na AWS com acesso anônimo. Tiles de 1 grau nomeados pelo canto
+  # SUDOESTE; Curitiba cai inteira em S26_00_W050_00.
   dem_source: copernicus-glo-30
+  url_template: "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_{tile}_DEM/Copernicus_DSM_COG_10_{tile}_DEM.tif"
   slope_units: degrees
-  # Reamostragem do DEM para a grade de 10 m antes do cálculo de declividade.
+  # Reamostragem BILINEAR para a grade de 10 m: elevação é contínua, e vizinho
+  # mais próximo criaria degraus de 30 m que virariam declividade serrilhada.
+  # Isso alinha a grade, NÃO cria detalhe — a declividade carrega informação de
+  # 30 m, e o documento precisa dizer isso.
   resample_to_resolution: true
+  # Rede de segurança: Curitiba está no primeiro planalto paranaense, perto de
+  # 900 m. Recorte que devolva altitude de nível do mar é outro tile.
+  expected_elevation_range_m: [700.0, 1200.0]
 
 occurrences:
   # ALVO SUPERVISIONADO — fonte ainda a definir (ver Fase 1).
@@ -179,11 +251,30 @@ risk_scenarios:
 split:
   # Split espacial em blocos: tiles vizinhos vazam contexto e inflam a métrica.
   strategy: spatial_block
-  block_size_m: 2000
+  # 5.120 m = 4x a pegada do patch (128 px x 10 m). O tamanho do bloco NÃO é
+  # livre: o 'make-dataset' descarta todo patch cuja pegada toque blocos de
+  # conjuntos diferentes, para que nenhum pixel apareça em dois conjuntos. Bloco
+  # pequeno demais faz essa faixa morta comer o conjunto inteiro; bloco grande
+  # demais deixa poucos blocos para sortear e a divisão 70/15/15 fica grosseira.
+  # A configuração recusa bloco menor que o dobro da pegada do patch.
+  block_size_m: 5120
   fractions:
     train: 0.70
     val: 0.15
     test: 0.15
+  # Randomização RESTRITA, não garimpo de semente.
+  #
+  # O sorteio dos blocos pode dar ao treino a periferia e à validação o miolo
+  # urbano. Como o Dice sobe com a prevalência da classe positiva, dois
+  # conjuntos com proporções de impermeável muito diferentes produzem métricas
+  # que não se comparam — a diferença medida seria de território, não de modelo.
+  #
+  # O critério está declarado AQUI, antes da varredura: o 'make-dataset' testa
+  # sementes consecutivas a partir de 'project.random_seed' e aceita a PRIMEIRA
+  # que fica dentro do limite (não a melhor de todas). Determinístico e
+  # reprodutível por terceiro. A semente efetiva vai para patches/split.json.
+  max_prevalence_spread_pp: 5.0
+  max_seed_attempts: 200
 
 model:
   arch: unet
@@ -201,6 +292,18 @@ model:
   max_epochs: 100
   early_stopping_patience: 15
   scheduler: reduce_on_plateau
+  # Windows: DataLoader com processos filhos usa 'spawn', que reimporta o módulo
+  # e exige guarda de __main__. Com 483 patches pequenos o gargalo é a GPU, não
+  # a leitura de disco, então 0 é mais rápido E mais simples aqui.
+  num_workers: 0
+  # Precisão mista. Em Blackwell é quase o dobro de velocidade sem efeito
+  # mensurável na métrica desta tarefa. Ignorado quando não há GPU.
+  amp: true
+  # Augmentation: apenas o grupo D4 (4 rotações x espelhamento). Imagem orbital
+  # não tem "em cima", então a simetria é real. NÃO há jitter radiométrico de
+  # propósito — reflectância é grandeza física calibrada, e distorcê-la ensina
+  # assinatura espectral que não existe. Ver src/floodrisk/model/data.py.
+  augment: true
 
 evaluation:
   # Limiar mínimo declarado no documento do TCC.

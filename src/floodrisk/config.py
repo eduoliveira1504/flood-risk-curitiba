@@ -236,19 +236,111 @@ class WorldCoverConfig:
 @dataclass(frozen=True)
 class OSMConfig:
     road_buffers_m: dict[str, float]
+    overpass_urls: list[str]
+    request_timeout_s: float
+    max_retries: int
+
+    def __post_init__(self) -> None:
+        if not self.overpass_urls:
+            raise ConfigError(
+                "'ground_truth.osm.overpass_urls' precisa listar ao menos um espelho"
+            )
+        if not self.road_buffers_m:
+            raise ConfigError("'ground_truth.osm.road_buffers_m' não pode ser vazio")
+        invalid = {k: v for k, v in self.road_buffers_m.items() if v <= 0}
+        if invalid:
+            raise ConfigError(
+                f"'ground_truth.osm.road_buffers_m': buffer não positivo em {sorted(invalid)}"
+            )
+
+
+@dataclass(frozen=True)
+class StreetsConfig:
+    """Malha viária oficial do município, via GeoCuritiba / IPPUC (ArcGIS REST)."""
+
+    source: str
+    service_url: str
+    layer_id: int
+    layer_name: str
+    source_crs: str
+    out_fields: list[str]
+    hierarchy_field: str
+    order_by_field: str
+    page_size: int
+    max_pages: int
+    request_timeout_s: float
+    max_retries: int
+    default_buffer_m: float
+    hierarchy_buffers_m: dict[str, float]
+
+    def __post_init__(self) -> None:
+        if self.source != "geocuritiba":
+            raise ConfigError(
+                "'ground_truth.streets.source': apenas 'geocuritiba' é implementado"
+            )
+        if self.default_buffer_m <= 0:
+            raise ConfigError("'ground_truth.streets.default_buffer_m' precisa ser > 0")
+        invalid = {k: v for k, v in self.hierarchy_buffers_m.items() if v <= 0}
+        if invalid:
+            raise ConfigError(
+                f"'ground_truth.streets.hierarchy_buffers_m': buffer não positivo "
+                f"em {sorted(invalid)}"
+            )
+        # O serviço limita a 2000 registros por página; pedir mais é ignorado em
+        # silêncio e a paginação passa a pular feições.
+        if not 1 <= self.page_size <= 2000:
+            raise ConfigError(
+                "'ground_truth.streets.page_size' precisa estar em [1, 2000]"
+            )
+        if self.hierarchy_field not in self.out_fields:
+            raise ConfigError(
+                f"'ground_truth.streets.hierarchy_field' ({self.hierarchy_field}) "
+                "precisa estar em 'out_fields', senão o atributo não é baixado"
+            )
+        if self.order_by_field not in self.out_fields:
+            raise ConfigError(
+                f"'ground_truth.streets.order_by_field' ({self.order_by_field}) "
+                "precisa estar em 'out_fields' para a paginação ser estável"
+            )
 
 
 @dataclass(frozen=True)
 class GroundTruthConfig:
+    roads_source: str
     worldcover: WorldCoverConfig
     osm: OSMConfig
+    streets: StreetsConfig
+
+    def __post_init__(self) -> None:
+        if self.roads_source not in {"geocuritiba", "osm"}:
+            raise ConfigError(
+                "'ground_truth.roads_source': esperado 'geocuritiba' ou 'osm', "
+                f"veio {self.roads_source!r}"
+            )
 
 
 @dataclass(frozen=True)
 class TerrainConfig:
     dem_source: str
+    url_template: str
     slope_units: str
     resample_to_resolution: bool
+    expected_elevation_range_m: list[float]
+
+    def __post_init__(self) -> None:
+        if "{tile}" not in self.url_template:
+            raise ConfigError("'terrain.url_template' precisa conter o marcador {tile}")
+        if self.slope_units != "degrees":
+            raise ConfigError("'terrain.slope_units': apenas 'degrees' é implementado")
+        if len(self.expected_elevation_range_m) != 2:
+            raise ConfigError(
+                "'terrain.expected_elevation_range_m': esperado [mínimo, máximo]"
+            )
+        low, high = self.expected_elevation_range_m
+        if low >= high:
+            raise ConfigError(
+                f"'terrain.expected_elevation_range_m': {low} não é menor que {high}"
+            )
 
 
 @dataclass(frozen=True)
@@ -270,6 +362,8 @@ class SplitConfig:
     strategy: str
     block_size_m: float
     fractions: dict[str, float]
+    max_prevalence_spread_pp: float
+    max_seed_attempts: int
 
     def __post_init__(self) -> None:
         total = sum(self.fractions.values())
@@ -280,6 +374,13 @@ class SplitConfig:
                 "'split.strategy': apenas 'spatial_block' é aceito — splits aleatórios "
                 "ou cronológicos vazam contexto espacial entre tiles vizinhos."
             )
+        if self.max_prevalence_spread_pp <= 0:
+            raise ConfigError(
+                "'split.max_prevalence_spread_pp' precisa ser positivo — é o "
+                "limite de desbalanceamento aceito entre os conjuntos."
+            )
+        if self.max_seed_attempts < 1:
+            raise ConfigError("'split.max_seed_attempts' precisa ser pelo menos 1")
 
 
 @dataclass(frozen=True)
@@ -303,6 +404,21 @@ class ModelConfig:
     max_epochs: int
     early_stopping_patience: int
     scheduler: str
+    num_workers: int
+    amp: bool
+    augment: bool
+
+    def __post_init__(self) -> None:
+        if self.in_channels < 1:
+            raise ConfigError("'model.in_channels' precisa ser pelo menos 1")
+        if self.batch_size < 1:
+            raise ConfigError("'model.batch_size' precisa ser pelo menos 1")
+        if self.max_epochs < 1:
+            raise ConfigError("'model.max_epochs' precisa ser pelo menos 1")
+        if self.early_stopping_patience < 1:
+            raise ConfigError("'model.early_stopping_patience' precisa ser pelo menos 1")
+        if self.num_workers < 0:
+            raise ConfigError("'model.num_workers' não pode ser negativo")
 
 
 @dataclass(frozen=True)
@@ -467,6 +583,20 @@ class Config:
     root: Path = field(default=Path("."), compare=False)
     source_file: Path | None = field(default=None, compare=False)
 
+    def __post_init__(self) -> None:
+        # Coerência entre seções. Cada dataclass valida o que está dentro dela;
+        # o que depende de duas seções só pode ser checado aqui.
+        patch_extent_m = self.raster.patch_size * self.raster.resolution_m
+        if self.split.block_size_m < 2 * patch_extent_m:
+            raise ConfigError(
+                f"'split.block_size_m' ({self.split.block_size_m:.0f} m) precisa "
+                f"ser pelo menos o dobro da pegada do patch "
+                f"({patch_extent_m:.0f} m = raster.patch_size × resolution_m). "
+                "O split espacial descarta todo patch que cruza a divisa entre "
+                "blocos de conjuntos diferentes; com bloco menor que isso, quase "
+                "nenhum patch sobrevive."
+            )
+
     # -- construção ------------------------------------------------------- #
 
     @classmethod
@@ -483,10 +613,12 @@ class Config:
 
         gt_raw = data["ground_truth"]
         ground_truth = GroundTruthConfig(
+            roads_source=gt_raw.get("roads_source", "geocuritiba"),
             worldcover=_build(
                 WorldCoverConfig, gt_raw.get("worldcover"), "ground_truth.worldcover"
             ),
             osm=_build(OSMConfig, gt_raw.get("osm"), "ground_truth.osm"),
+            streets=_build(StreetsConfig, gt_raw.get("streets"), "ground_truth.streets"),
         )
 
         model_raw = dict(data["model"])

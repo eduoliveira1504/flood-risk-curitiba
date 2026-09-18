@@ -43,7 +43,7 @@ __all__ = [
     "write_snapshot",
 ]
 
-_USER_AGENT = "flood-risk-curitiba/0.1 (TCC FAE Centro Universitário; academic use)"
+_USER_AGENT = "flood-risk-curitiba/0.1 (TCC, FAE Centro Universitario, Curitiba BR; academic use)"
 
 # Códigos que valem uma nova tentativa: 429 é limite de taxa, 5xx é falha do lado deles.
 _RETRYABLE_STATUS = frozenset({429, 500, 502, 503, 504})

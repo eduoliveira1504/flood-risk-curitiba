@@ -1,0 +1,25 @@
+{
+  "block_size_m": 5120,
+  "blocks": 40,
+  "candidates": 620,
+  "chosen_seed": 150,
+  "configured_seed": 42,
+  "dropped_at_block_boundary": 137,
+  "kept": {
+    "test": 72,
+    "train": 350,
+    "val": 61
+  },
+  "max_prevalence_spread_pp": 5.0,
+  "patch_extent_m": 1280,
+  "patch_size_px": 128,
+  "prevalence_spread_pp": 3.642,
+  "requested_fractions": {
+    "test": 0.15,
+    "train": 0.7,
+    "val": 0.15
+  },
+  "seed_attempts": 109,
+  "strategy": "spatial_block",
+  "stride_px": 112
+}
