@@ -1,0 +1,79 @@
+[
+  {
+    "objectID": "metodologia.html",
+    "href": "metodologia.html",
+    "title": "Metodologia",
+    "section": "",
+    "text": "Alagamento urbano acontece onde muita água é gerada e pouca gravidade a leva embora. Superfície impermeável — asfalto, telhado, calçada — determina quanta chuva vira escoamento em vez de infiltrar no solo. Declividade determina se essa água permanece ou desce. Uma área impermeável numa ladeira não alaga ali: transfere o problema para baixo. Uma área permeável e plana absorve.\nO índice é o produto dos dois fatores, não a soma. Numa soma, uma célula íngreme e totalmente selada empataria com uma plana e semipermeável, que são situações fisicamente distintas. No produto, um fator próximo de zero zera o resultado, que é o comportamento correto.\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nCamada\nFonte\nPapel\n\n\n\n\nImagem óptica\nCopernicus Sentinel-2 L2A, mediana de 2024\nEntrada da rede neural\n\n\nSuperfície construída\nESA WorldCover 2021 v200\nRótulo de treino\n\n\nMalha viária\nGeoCuritiba / IPPUC\nComplementa o rótulo nas vias\n\n\nElevação\nCopernicus DEM GLO-30\nOrigem da declividade\n\n\nLimite municipal\nMalhas municipais do IBGE\nRecorte do produto\n\n\nChuva\nOpen-Meteo (CC-BY 4.0)\nCenário exibido ao lado do mapa\n\n\n\nA imagem é uma mediana temporal de todas as cenas de 2024 com menos de 20% de nuvem, com as classes de nuvem e sombra descartadas pixel a pixel antes da composição. Mediana e não média: uma nuvem residual que escape do filtro desloca a média e não desloca a mediana.\n\n\n\nUma rede U-Net com encoder ResNet34 segmenta superfície impermeável a partir de quatro bandas do Sentinel-2. O treino usa recortes de 128 × 128 pixels (1.280 metros de lado) e as métricas abaixo vêm de um conjunto de teste que o modelo nunca viu durante o treino nem durante a escolha de hiperparâmetros.\n\n\n\n\n\nDividir recortes aleatoriamente entre treino e teste é o erro clássico em sensoriamento remoto: dois recortes vizinhos compartilham pixels e contexto, e a métrica de teste passa a medir memorização em vez de generalização.\nAqui o território é dividido em blocos, e a regra é mais forte do que “cada bloco vai para um conjunto”: um recorte só é aceito se todos os blocos que sua área toca pertencerem ao mesmo conjunto. Com isso a ausência de vazamento é demonstrável — se um recorte de treino e um de teste se sobrepusessem, o ponto em comum estaria num bloco simultaneamente de treino e de teste, o que é impossível por construção. O preço é uma faixa descartada em volta de cada divisa.\n\n\n\n\n\n\nO conjunto de teste abrange desde periferia metropolitana até tecido urbano consolidado — territórios com proporções de superfície selada muito diferentes. Como a métrica Dice tende a subir com a prevalência da classe positiva, manter o desempenho na faixa de baixa cobertura é o indício de generalização que interessa.\n\n\n\n\n\n\n\nOs patamares não foram escolhidos por este trabalho: são os critérios de Aviso Meteorológico para chuvas intensas do INMET, a régua usada para emitir alerta à população brasileira. Adotá-los troca uma decisão do autor por um critério normativo verificável.\n\n\n\nSão dois critérios, e vale o mais severo — como no próprio INMET. Alagamento urbano responde à intensidade e não apenas ao volume: 30 mm em uma hora alagam, os mesmos 30 mm espalhados por 24 horas não. Um limiar único não distingue os dois casos.\n\n\n\nEstas são as fronteiras do que o mapa sustenta. Lê-lo além delas leva a conclusões que o método não autoriza.\nA métrica mede concordância com o WorldCover, não acurácia contra campo. O rótulo de treino é derivado do ESA WorldCover, que por sua vez é produto de um classificador automático sobre imagens de satélite. O Dice reportado diz o quanto a rede reproduz esse rótulo — não o quanto acerta a realidade do terreno. Uma validação contra levantamento de campo ou cadastro de uso do solo continua em aberto.\nA chuva não recalibra o mapa. Sem uma base de ocorrências registradas de alagamento não há como calibrar a relação entre milímetros acumulados e área efetivamente alagada. Qualquer peso atribuído aqui — “cenário crítico vale o dobro do forte” — seria arbitrário, e arbitrariedade disfarçada de modelo é pior do que sua ausência declarada. Por isso o índice é estático e o cenário de chuva aparece ao lado, para leitura conjunta. Obter a base de ocorrências da Defesa Civil municipal é o próximo passo natural do trabalho, e destrava tanto essa calibração quanto uma validação independente do índice.\nA declividade vem de um modelo de 30 metros. O Copernicus DEM GLO-30 foi reamostrado para 10 metros para alinhar com a grade da imagem. Isso alinha, não cria detalhe: a declividade carrega informação de 30 metros.\nA célula de 200 metros é a menor unidade de leitura. Dentro dela, uma quadra densa e uma praça entram na mesma média. O mapa não sustenta leitura por lote nem por rua.\nO índice é relativo a Curitiba. As faixas são quintis do próprio município, então “muito alta” significa “entre as 20% mais suscetíveis desta cidade” — não um patamar absoluto comparável com outro município.\n\n\n\nTodo o pipeline é código versionado, dividido em estágios independentes que leem e escrevem arquivos em disco. Os parâmetros ficam num único arquivo de configuração, e a divisão dos dados — inclusive a semente efetiva e o critério que a selecionou — fica registrada junto dos resultados.\nO repositório traz as instruções de execução."
+  },
+  {
+    "objectID": "metodologia.html#o-que-o-mapa-mede",
+    "href": "metodologia.html#o-que-o-mapa-mede",
+    "title": "Metodologia",
+    "section": "",
+    "text": "Alagamento urbano acontece onde muita água é gerada e pouca gravidade a leva embora. Superfície impermeável — asfalto, telhado, calçada — determina quanta chuva vira escoamento em vez de infiltrar no solo. Declividade determina se essa água permanece ou desce. Uma área impermeável numa ladeira não alaga ali: transfere o problema para baixo. Uma área permeável e plana absorve.\nO índice é o produto dos dois fatores, não a soma. Numa soma, uma célula íngreme e totalmente selada empataria com uma plana e semipermeável, que são situações fisicamente distintas. No produto, um fator próximo de zero zera o resultado, que é o comportamento correto."
+  },
+  {
+    "objectID": "metodologia.html#de-onde-vêm-os-dados",
+    "href": "metodologia.html#de-onde-vêm-os-dados",
+    "title": "Metodologia",
+    "section": "",
+    "text": "Camada\nFonte\nPapel\n\n\n\n\nImagem óptica\nCopernicus Sentinel-2 L2A, mediana de 2024\nEntrada da rede neural\n\n\nSuperfície construída\nESA WorldCover 2021 v200\nRótulo de treino\n\n\nMalha viária\nGeoCuritiba / IPPUC\nComplementa o rótulo nas vias\n\n\nElevação\nCopernicus DEM GLO-30\nOrigem da declividade\n\n\nLimite municipal\nMalhas municipais do IBGE\nRecorte do produto\n\n\nChuva\nOpen-Meteo (CC-BY 4.0)\nCenário exibido ao lado do mapa\n\n\n\nA imagem é uma mediana temporal de todas as cenas de 2024 com menos de 20% de nuvem, com as classes de nuvem e sombra descartadas pixel a pixel antes da composição. Mediana e não média: uma nuvem residual que escape do filtro desloca a média e não desloca a mediana."
+  },
+  {
+    "objectID": "metodologia.html#como-a-impermeabilidade-é-estimada",
+    "href": "metodologia.html#como-a-impermeabilidade-é-estimada",
+    "title": "Metodologia",
+    "section": "",
+    "text": "Uma rede U-Net com encoder ResNet34 segmenta superfície impermeável a partir de quatro bandas do Sentinel-2. O treino usa recortes de 128 × 128 pixels (1.280 metros de lado) e as métricas abaixo vêm de um conjunto de teste que o modelo nunca viu durante o treino nem durante a escolha de hiperparâmetros.\n\n\n\n\n\nDividir recortes aleatoriamente entre treino e teste é o erro clássico em sensoriamento remoto: dois recortes vizinhos compartilham pixels e contexto, e a métrica de teste passa a medir memorização em vez de generalização.\nAqui o território é dividido em blocos, e a regra é mais forte do que “cada bloco vai para um conjunto”: um recorte só é aceito se todos os blocos que sua área toca pertencerem ao mesmo conjunto. Com isso a ausência de vazamento é demonstrável — se um recorte de treino e um de teste se sobrepusessem, o ponto em comum estaria num bloco simultaneamente de treino e de teste, o que é impossível por construção. O preço é uma faixa descartada em volta de cada divisa.\n\n\n\n\n\n\nO conjunto de teste abrange desde periferia metropolitana até tecido urbano consolidado — territórios com proporções de superfície selada muito diferentes. Como a métrica Dice tende a subir com a prevalência da classe positiva, manter o desempenho na faixa de baixa cobertura é o indício de generalização que interessa."
+  },
+  {
+    "objectID": "metodologia.html#os-cenários-de-chuva",
+    "href": "metodologia.html#os-cenários-de-chuva",
+    "title": "Metodologia",
+    "section": "",
+    "text": "Os patamares não foram escolhidos por este trabalho: são os critérios de Aviso Meteorológico para chuvas intensas do INMET, a régua usada para emitir alerta à população brasileira. Adotá-los troca uma decisão do autor por um critério normativo verificável.\n\n\n\nSão dois critérios, e vale o mais severo — como no próprio INMET. Alagamento urbano responde à intensidade e não apenas ao volume: 30 mm em uma hora alagam, os mesmos 30 mm espalhados por 24 horas não. Um limiar único não distingue os dois casos."
+  },
+  {
+    "objectID": "metodologia.html#limitações",
+    "href": "metodologia.html#limitações",
+    "title": "Metodologia",
+    "section": "",
+    "text": "Estas são as fronteiras do que o mapa sustenta. Lê-lo além delas leva a conclusões que o método não autoriza.\nA métrica mede concordância com o WorldCover, não acurácia contra campo. O rótulo de treino é derivado do ESA WorldCover, que por sua vez é produto de um classificador automático sobre imagens de satélite. O Dice reportado diz o quanto a rede reproduz esse rótulo — não o quanto acerta a realidade do terreno. Uma validação contra levantamento de campo ou cadastro de uso do solo continua em aberto.\nA chuva não recalibra o mapa. Sem uma base de ocorrências registradas de alagamento não há como calibrar a relação entre milímetros acumulados e área efetivamente alagada. Qualquer peso atribuído aqui — “cenário crítico vale o dobro do forte” — seria arbitrário, e arbitrariedade disfarçada de modelo é pior do que sua ausência declarada. Por isso o índice é estático e o cenário de chuva aparece ao lado, para leitura conjunta. Obter a base de ocorrências da Defesa Civil municipal é o próximo passo natural do trabalho, e destrava tanto essa calibração quanto uma validação independente do índice.\nA declividade vem de um modelo de 30 metros. O Copernicus DEM GLO-30 foi reamostrado para 10 metros para alinhar com a grade da imagem. Isso alinha, não cria detalhe: a declividade carrega informação de 30 metros.\nA célula de 200 metros é a menor unidade de leitura. Dentro dela, uma quadra densa e uma praça entram na mesma média. O mapa não sustenta leitura por lote nem por rua.\nO índice é relativo a Curitiba. As faixas são quintis do próprio município, então “muito alta” significa “entre as 20% mais suscetíveis desta cidade” — não um patamar absoluto comparável com outro município."
+  },
+  {
+    "objectID": "metodologia.html#reprodutibilidade",
+    "href": "metodologia.html#reprodutibilidade",
+    "title": "Metodologia",
+    "section": "",
+    "text": "Todo o pipeline é código versionado, dividido em estágios independentes que leem e escrevem arquivos em disco. Os parâmetros ficam num único arquivo de configuração, e a divisão dos dados — inclusive a semente efetiva e o critério que a selecionou — fica registrada junto dos resultados.\nO repositório traz as instruções de execução."
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "Suscetibilidade a alagamento em Curitiba",
+    "section": "",
+    "text": "O mapa abaixo classifica Curitiba em células de 200 metros pela suscetibilidade a alagamento: o cruzamento entre quanta superfície impermeável existe na célula — estimada por uma rede neural sobre imagens Sentinel-2 — e quão plano é o terreno ali. Superfície selada define quanta chuva vira escoamento em vez de infiltrar; declividade define se essa água fica ou desce.\nA suscetibilidade é propriedade do território, não da previsão do tempo: ela não muda quando chove. O painel de chuva mostra o cenário previsto ao lado, para leitura conjunta. A metodologia explica por que os dois não são multiplicados um pelo outro.\n\n\n\n\nCenáriocarregando…\n\n\nPico horário—\n\n\nPico em 24 h—\n\n\nCritério—\n\n\n\n\n\n\n\n\n\n\n\n\n\nClique numa célula para ver a impermeabilidade estimada, a declividade média e o índice. As faixas são quintis: cada uma reúne 20% do território municipal, então a leitura é relativa a Curitiba — “esta célula está entre as 20% mais suscetíveis da cidade”.\n\n\n\n\nMesma informação do mapa, em tabela — para quem lê com leitor de tela, para quem não distingue as cores e para conferir os números sem passar o mouse célula a célula."
+  },
+  {
+    "objectID": "index.html#chuva-prevista",
+    "href": "index.html#chuva-prevista",
+    "title": "Suscetibilidade a alagamento em Curitiba",
+    "section": "",
+    "text": "Cenáriocarregando…\n\n\nPico horário—\n\n\nPico em 24 h—\n\n\nCritério—"
+  },
+  {
+    "objectID": "index.html#mapa",
+    "href": "index.html#mapa",
+    "title": "Suscetibilidade a alagamento em Curitiba",
+    "section": "",
+    "text": "Clique numa célula para ver a impermeabilidade estimada, a declividade média e o índice. As faixas são quintis: cada uma reúne 20% do território municipal, então a leitura é relativa a Curitiba — “esta célula está entre as 20% mais suscetíveis da cidade”."
+  },
+  {
+    "objectID": "index.html#as-faixas-em-números",
+    "href": "index.html#as-faixas-em-números",
+    "title": "Suscetibilidade a alagamento em Curitiba",
+    "section": "",
+    "text": "Mesma informação do mapa, em tabela — para quem lê com leitor de tela, para quem não distingue as cores e para conferir os números sem passar o mouse célula a célula."
+  }
+]

@@ -35,6 +35,83 @@
       "valid_pixels": 1179648.0
     }
   },
+  "test_by_aoi_fraction": [
+    {
+      "accuracy": 0.9629789653577303,
+      "dice": 0.9228942183208609,
+      "false_negative": 9640.0,
+      "false_positive": 13409.0,
+      "high": 0.25,
+      "iou": 0.8568278380997342,
+      "low": 0.0,
+      "patches": 38,
+      "positive_rate": 0.2370396664268092,
+      "precision": 0.9114028596347491,
+      "recall": 0.9346790532528341,
+      "specificity": 0.9717712988907672,
+      "threshold": 0.49,
+      "true_negative": 461604.0,
+      "true_positive": 137939.0,
+      "valid_pixels": 622592.0
+    },
+    {
+      "accuracy": 0.97064208984375,
+      "dice": 0.8797800549862534,
+      "false_negative": 155.0,
+      "false_positive": 326.0,
+      "high": 0.5,
+      "iou": 0.785363676929942,
+      "low": 0.25,
+      "patches": 1,
+      "positive_rate": 0.11688232421875,
+      "precision": 0.8437200383509108,
+      "recall": 0.9190600522193212,
+      "specificity": 0.9774690718086945,
+      "threshold": 0.49,
+      "true_negative": 14143.0,
+      "true_positive": 1760.0,
+      "valid_pixels": 16384.0
+    },
+    {
+      "high": 0.75,
+      "low": 0.5,
+      "patches": 0
+    },
+    {
+      "accuracy": 0.9087320963541666,
+      "dice": 0.9347397711011953,
+      "false_negative": 17227.0,
+      "false_positive": 32119.0,
+      "high": 1.0,
+      "iou": 0.8774755179468844,
+      "low": 0.75,
+      "patches": 33,
+      "positive_rate": 0.6854895389441288,
+      "precision": 0.9166859049017294,
+      "recall": 0.9535190556492411,
+      "specificity": 0.811116926496792,
+      "threshold": 0.49,
+      "true_negative": 137928.0,
+      "true_positive": 353398.0,
+      "valid_pixels": 540672.0
+    }
+  ],
+  "test_inside_curitiba": {
+    "accuracy": 0.9065780639648438,
+    "dice": 0.9351617250317042,
+    "false_negative": 16896.0,
+    "false_positive": 32084.0,
+    "iou": 0.8782194883627259,
+    "patches": 32,
+    "positive_rate": 0.7059383392333984,
+    "precision": 0.9167304692670444,
+    "recall": 0.9543493238588007,
+    "specificity": 0.7918961167000707,
+    "threshold": 0.49,
+    "true_negative": 122089.0,
+    "true_positive": 353219.0,
+    "valid_pixels": 524288.0
+  },
   "tuned_on": "val",
   "tuned_threshold": 0.49,
   "validation": {

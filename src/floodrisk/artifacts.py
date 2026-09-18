@@ -19,6 +19,8 @@ __all__ = [
     "dem",
     "evaluation_report",
     "impervious_mask",
+    "impervious_predicted",
+    "impervious_probability",
     "normalisation",
     "osm_roads",
     "patch_footprints",
@@ -29,6 +31,8 @@ __all__ = [
     "slope",
     "split_record",
     "streets",
+    "susceptibility_cells",
+    "susceptibility_geojson",
     "training_history",
     "worldcover",
 ]
@@ -92,6 +96,20 @@ def impervious_mask(config: Config) -> Path:
     return config.path("data_processed") / "impervious_mask.tif"
 
 
+def impervious_probability(config: Config) -> Path:
+    """Probabilidade de superfície impermeável, predita pela U-Net na cidade toda.
+
+    Fica em probabilidade, não binarizada: o índice de suscetibilidade ganha em
+    usar a incerteza do modelo em vez de um sim/não que a descarta.
+    """
+    return config.path("data_processed") / "impervious_probability.tif"
+
+
+def impervious_predicted(config: Config) -> Path:
+    """Binarização da predição no limiar calibrado na validação."""
+    return config.path("data_processed") / "impervious_predicted.tif"
+
+
 def patches_dir(config: Config) -> Path:
     """Raiz dos patches de treino, com uma subpasta por conjunto do split."""
     return config.path("data_processed") / "patches"
@@ -142,3 +160,13 @@ def split_record(config: Config) -> Path:
     uma execução não é reprodutível por terceiro.
     """
     return patches_dir(config) / "split.json"
+
+
+def susceptibility_cells(config: Config) -> Path:
+    """Grade zonal com o índice de suscetibilidade e sua classificação."""
+    return config.path("data_processed") / "susceptibility.gpkg"
+
+
+def susceptibility_geojson(config: Config) -> Path:
+    """Mesma grade em GeoJSON/WGS84 — é o que o site publicado consome."""
+    return config.path("reports") / "web" / "susceptibility.geojson"

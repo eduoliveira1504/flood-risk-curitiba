@@ -181,3 +181,66 @@ def test_a_fully_invalid_patch_does_not_divide_by_zero():
     prob, label, valid = single([0.9, 0.9], [1, 1], [0, 0])
     metrics = metrics_at(prob, label, valid, 0.5)
     assert metrics["dice"] == 0.0 and metrics["accuracy"] == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# Decomposição pela fração dentro do município
+# --------------------------------------------------------------------------- #
+
+
+def test_every_bin_is_reported_even_when_empty():
+    from floodrisk.model.evaluate import AOI_BINS, by_aoi_fraction
+
+    prob = np.ones((2, 2, 2), dtype="float32")
+    rows = by_aoi_fraction(prob, prob, np.ones_like(prob), [1.0, 1.0], 0.5)
+    assert len(rows) == len(AOI_BINS)
+    assert [row["patches"] for row in rows] == [0, 0, 0, 2]
+
+
+def test_a_patch_entirely_inside_lands_in_the_last_bin():
+    """A última faixa é fechada à direita — 100% não pode ficar de fora."""
+    from floodrisk.model.evaluate import by_aoi_fraction
+
+    prob = np.ones((1, 2, 2), dtype="float32")
+    rows = by_aoi_fraction(prob, prob, np.ones_like(prob), [1.0], 0.5)
+    assert rows[-1]["patches"] == 1
+
+
+def test_bin_edges_belong_to_the_bin_that_starts_there():
+    from floodrisk.model.evaluate import by_aoi_fraction
+
+    prob = np.ones((4, 2, 2), dtype="float32")
+    rows = by_aoi_fraction(prob, prob, np.ones_like(prob), [0.0, 0.25, 0.5, 0.75], 0.5)
+    assert [row["patches"] for row in rows] == [1, 1, 1, 1]
+
+
+def test_the_patch_counts_add_up_to_the_whole_set():
+    from floodrisk.model.evaluate import by_aoi_fraction
+
+    rng = np.random.default_rng(0)
+    prob = rng.random((20, 4, 4)).astype("float32")
+    label = (rng.random((20, 4, 4)) > 0.5).astype("float32")
+    fractions = rng.random(20)
+    rows = by_aoi_fraction(prob, label, np.ones_like(prob), fractions, 0.5)
+    assert sum(row["patches"] for row in rows) == 20
+
+
+def test_each_bin_is_scored_only_on_its_own_patches():
+    """Um grupo perfeito e outro péssimo não podem se misturar entre faixas."""
+    from floodrisk.model.evaluate import by_aoi_fraction
+
+    perfect = np.ones((1, 4, 4), dtype="float32")
+    wrong = np.zeros((1, 4, 4), dtype="float32")
+    prob = np.concatenate([wrong, perfect])
+    label = np.ones((2, 4, 4), dtype="float32")
+    rows = by_aoi_fraction(prob, label, np.ones_like(prob), [0.1, 1.0], 0.5)
+    assert rows[0]["dice"] == pytest.approx(0.0)
+    assert rows[-1]["dice"] == pytest.approx(1.0)
+
+
+def test_a_mismatch_between_patches_and_fractions_is_rejected():
+    from floodrisk.model.evaluate import EvaluateError, by_aoi_fraction
+
+    prob = np.ones((3, 2, 2), dtype="float32")
+    with pytest.raises(EvaluateError, match="frações"):
+        by_aoi_fraction(prob, prob, np.ones_like(prob), [1.0, 1.0], 0.5)

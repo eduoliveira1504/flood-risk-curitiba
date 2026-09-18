@@ -1,0 +1,275 @@
+---
+title: "Suscetibilidade a alagamento em Curitiba"
+subtitle: "Onde a chuva encontra superfície impermeável em terreno plano"
+---
+
+::: {.viz-root}
+
+O mapa abaixo classifica Curitiba em células de 200 metros pela **suscetibilidade
+a alagamento**: o cruzamento entre quanta superfície impermeável existe na célula
+— estimada por uma rede neural sobre imagens Sentinel-2 — e quão plano é o
+terreno ali. Superfície selada define quanta chuva vira escoamento em vez de
+infiltrar; declividade define se essa água fica ou desce.
+
+A suscetibilidade é propriedade do **território**, não da previsão do tempo: ela
+não muda quando chove. O painel de chuva mostra o cenário previsto ao lado, para
+leitura conjunta. A [metodologia](metodologia.qmd) explica por que os dois não
+são multiplicados um pelo outro.
+
+## Chuva prevista
+
+<div class="painel-chuva" id="painel-chuva" aria-live="polite">
+  <div><span class="rotulo">Cenário</span><span class="cenario" id="cenario">carregando…</span></div>
+  <div><span class="rotulo">Pico horário</span><span class="detalhe" id="pico-hora">—</span></div>
+  <div><span class="rotulo">Pico em 24 h</span><span class="detalhe" id="pico-dia">—</span></div>
+  <div><span class="rotulo">Critério</span><span class="detalhe" id="criterio">—</span></div>
+</div>
+
+<p class="aviso" id="fonte-chuva"></p>
+
+## Mapa
+
+<div id="mapa" role="img" aria-label="Mapa de suscetibilidade a alagamento em Curitiba, classificado em cinco faixas"></div>
+
+<ul class="legenda" id="legenda"></ul>
+
+<p class="aviso">
+Clique numa célula para ver a impermeabilidade estimada, a declividade média e o
+índice. As faixas são <strong>quintis</strong>: cada uma reúne 20% do território
+municipal, então a leitura é relativa a Curitiba — "esta célula está entre as 20%
+mais suscetíveis da cidade".
+</p>
+
+## As faixas em números
+
+Mesma informação do mapa, em tabela — para quem lê com leitor de tela, para quem
+não distingue as cores e para conferir os números sem passar o mouse célula a
+célula.
+
+<div id="tabela-classes"></div>
+
+:::
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
+<script type="module">
+// Lê a rampa dos custom properties do CSS: a paleta tem UMA definição, no
+// styles.css, e nada aqui repete hex.
+const raiz = document.querySelector('.viz-root');
+const cor = (n) => getComputedStyle(raiz).getPropertyValue(`--risk-${n}`).trim();
+const CORES = [1, 2, 3, 4, 5].map(cor);
+
+const numero = (valor, casas = 1) =>
+  valor === undefined || valor === null
+    ? '—'
+    : valor.toLocaleString('pt-BR', {
+        minimumFractionDigits: casas,
+        maximumFractionDigits: casas,
+      });
+
+async function carregar(caminho) {
+  const resposta = await fetch(caminho);
+  if (!resposta.ok) throw new Error(`${caminho}: HTTP ${resposta.status}`);
+  return resposta.json();
+}
+
+// --------------------------------------------------------------------------
+// Mapa
+// --------------------------------------------------------------------------
+
+// preferCanvas: são 11 mil polígonos. Em SVG, que é o padrão do Leaflet, o
+// navegador cria 11 mil nós no DOM e o mapa engasga ao arrastar.
+const mapa = L.map('mapa', { preferCanvas: true, scrollWheelZoom: false });
+mapa.setView([-25.4284, -49.2733], 11);
+
+const metricas = await carregar('data/metrics.json');
+
+// Duas bases. A de satélite é o PRÓPRIO mosaico que treinou a rede — mesma data,
+// mesma composição, mesma resolução —, então quem olha o mapa está vendo a
+// entrada do modelo, não uma imagem de outro ano e outro sensor. Isso também
+// dispensa provedor externo de imagem, que costuma exigir chave.
+const bases = {};
+
+const satelite = metricas.basemap;
+if (satelite) {
+  bases['Satélite (Sentinel-2)'] = L.imageOverlay(
+    `data/${satelite.file}`,
+    satelite.bounds,
+    {
+      attribution: `${satelite.source} — ${satelite.period}`,
+      // Fica abaixo das células, que são desenhadas no painel de overlay.
+      zIndex: 1,
+    },
+  );
+}
+
+bases['Mapa'] = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+  maxZoom: 19,
+});
+
+// Satélite primeiro quando existir: é o que dá contexto visual imediato de onde
+// está o tecido urbano que o índice mede.
+const baseInicial = bases['Satélite (Sentinel-2)'] ?? bases['Mapa'];
+baseInicial.addTo(mapa);
+const rotulos = metricas.grid?.classes ?? [
+  'muito baixa', 'baixa', 'média', 'alta', 'muito alta',
+];
+// As propriedades viajam com nomes curtos para o arquivo não inchar; o mapeamento
+// vem do metrics.json para que as letras não fiquem espalhadas por este código.
+const chave = metricas.grid?.properties ?? {
+  class_index: 'c', susceptibility: 's', impervious_mean: 'i', slope_mean_deg: 'd',
+};
+
+const grade = await carregar('data/susceptibility.geojson');
+
+const camada = L.geoJSON(grade, {
+  style: (feicao) => ({
+    fillColor: CORES[feicao.properties[chave.class_index]] ?? CORES[0],
+    // 0,7 é o meio-termo: sobre a imagem de satélite deixa a textura urbana
+    // aparecer por baixo, e sobre o mapa de ruas ainda lê como cor sólida.
+    fillOpacity: 0.7,
+    // Sem contorno: a 11 mil células, a borda some no zoom afastado e vira uma
+    // mancha escura que engorda a classe alta.
+    weight: 0,
+  }),
+  onEachFeature: (feicao, elemento) => {
+    const p = feicao.properties;
+    const faixa = rotulos[p[chave.class_index]] ?? '—';
+    elemento.bindPopup(`
+      <strong>Suscetibilidade ${faixa}</strong>
+      <dl>
+        <dt>Impermeável</dt><dd>${numero(p[chave.impervious_mean] * 100)}%</dd>
+        <dt>Declividade</dt><dd>${numero(p[chave.slope_mean_deg], 2)}°</dd>
+        <dt>Índice</dt><dd>${numero(p[chave.susceptibility], 3)}</dd>
+      </dl>
+    `);
+  },
+}).addTo(mapa);
+
+mapa.fitBounds(camada.getBounds());
+
+// O seletor entra depois da camada de células, para que ela apareça como
+// sobreposição que pode ser desligada — útil para olhar a imagem crua por baixo.
+L.control
+  .layers(bases, { 'Suscetibilidade': camada }, { collapsed: false })
+  .addTo(mapa);
+
+// Legenda: sempre presente, e o rótulo textual vai junto da marca — a classe
+// nunca é comunicada só por cor.
+document.getElementById('legenda').innerHTML = rotulos
+  .map((rotulo, i) => `<li><span class="marca" style="background:${CORES[i]}"></span>${rotulo}</li>`)
+  .join('');
+
+// --------------------------------------------------------------------------
+// Tabela — a leitura alternativa ao mapa
+// --------------------------------------------------------------------------
+
+const contagem = new Array(rotulos.length).fill(0);
+const somaImp = new Array(rotulos.length).fill(0);
+const somaDec = new Array(rotulos.length).fill(0);
+
+for (const f of grade.features) {
+  const i = f.properties[chave.class_index];
+  contagem[i] += 1;
+  somaImp[i] += f.properties[chave.impervious_mean] ?? 0;
+  somaDec[i] += f.properties[chave.slope_mean_deg] ?? 0;
+}
+
+const lado = metricas.grid?.cell_size_m ?? 200;
+const areaCelula = (lado * lado) / 1e6;
+const total = grade.features.length;
+
+document.getElementById('tabela-classes').innerHTML = `
+  <table class="table classes">
+    <thead>
+      <tr><th>Faixa</th><th>Células</th><th>Área</th><th>Impermeável</th><th>Declividade</th></tr>
+    </thead>
+    <tbody>
+      ${rotulos.map((rotulo, i) => `
+        <tr>
+          <td><span class="marca" style="background:${CORES[i]};display:inline-block;vertical-align:middle;margin-right:.4rem"></span>${rotulo}</td>
+          <td>${contagem[i].toLocaleString('pt-BR')}</td>
+          <td>${numero(contagem[i] * areaCelula)} km²</td>
+          <td>${numero((somaImp[i] / Math.max(contagem[i], 1)) * 100)}%</td>
+          <td>${numero(somaDec[i] / Math.max(contagem[i], 1), 2)}°</td>
+        </tr>`).join('')}
+    </tbody>
+    <tfoot>
+      <tr><td>Total</td><td>${total.toLocaleString('pt-BR')}</td>
+      <td>${numero(total * areaCelula)} km²</td><td></td><td></td></tr>
+    </tfoot>
+  </table>`;
+
+// --------------------------------------------------------------------------
+// Chuva — ao vivo quando possível, snapshot quando não
+// --------------------------------------------------------------------------
+
+const patamares = metricas.scenarios?.tiers ?? [];
+
+// Mesmo "ou" dos critérios do INMET: vale o patamar mais alto atingido por
+// qualquer um dos dois.
+function classificar(picoHora, picoDia) {
+  let escolhido = patamares[0];
+  for (const t of patamares) {
+    if (picoHora >= t.hourly_mm || picoDia >= t.daily_mm) escolhido = t;
+  }
+  return escolhido;
+}
+
+function maiorAcumulado(valores, janela) {
+  if (!valores.length) return 0;
+  if (janela >= valores.length) return valores.reduce((a, b) => a + b, 0);
+  let atual = valores.slice(0, janela).reduce((a, b) => a + b, 0);
+  let melhor = atual;
+  for (let i = janela; i < valores.length; i += 1) {
+    atual += valores[i] - valores[i - janela];
+    melhor = Math.max(melhor, atual);
+  }
+  return melhor;
+}
+
+function mostrarChuva(picoHora, picoDia, origem) {
+  const patamar = classificar(picoHora, picoDia) ?? {};
+  const porIntensidade = (patamar.hourly_mm ?? 0) > 0 && picoHora >= patamar.hourly_mm;
+  document.getElementById('cenario').textContent = patamar.label ?? '—';
+  document.getElementById('pico-hora').textContent = `${numero(picoHora)} mm/h`;
+  document.getElementById('pico-dia').textContent = `${numero(picoDia)} mm`;
+  document.getElementById('criterio').textContent =
+    (patamar.daily_mm ?? 0) === 0
+      ? 'nenhum critério atingido'
+      : porIntensidade ? 'intensidade horária' : 'acumulado em 24 h';
+  document.getElementById('fonte-chuva').textContent =
+    `${origem} · patamares: ${metricas.scenarios?.source ?? ''} · ${metricas.attribution?.forecast ?? ''}`;
+}
+
+const PONTO = { lat: -25.4284, lon: -49.2733 };
+
+try {
+  // A chamada ao vivo pode falhar por CORS, rede da sala ou API fora do ar. O
+  // snapshot existe exatamente para que a página nunca dependa disso.
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${PONTO.lat}&longitude=${PONTO.lon}&hourly=precipitation&forecast_days=2&timezone=America%2FSao_Paulo`;
+  const resposta = await fetch(url, { signal: AbortSignal.timeout(6000) });
+  if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
+  const dados = await resposta.json();
+  const chuva = dados.hourly?.precipitation ?? [];
+  if (!chuva.length) throw new Error('série vazia');
+  mostrarChuva(maiorAcumulado(chuva, 1), maiorAcumulado(chuva, 24), 'Previsão ao vivo');
+} catch (erro) {
+  console.warn('Open-Meteo ao vivo indisponível, usando o snapshot:', erro);
+  try {
+    const snapshot = await carregar('data/forecast.json');
+    mostrarChuva(
+      snapshot.peak_hourly_mm ?? 0,
+      snapshot.peak_daily_mm ?? 0,
+      `Snapshot de ${new Date(snapshot.generated_at).toLocaleString('pt-BR')}`,
+    );
+  } catch (falha) {
+    document.getElementById('cenario').textContent = 'indisponível';
+    document.getElementById('fonte-chuva').textContent =
+      'Não foi possível obter a previsão nem o snapshot.';
+    console.error(falha);
+  }
+}
+</script>

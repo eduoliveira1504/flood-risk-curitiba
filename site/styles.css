@@ -1,0 +1,164 @@
+/* Estilos do site de suscetibilidade.
+ *
+ * A rampa de cor é declarada uma vez como custom properties e consumida por
+ * papel — legenda, mapa e tabela leem os mesmos tokens, então trocar a paleta é
+ * mexer num lugar só e nada sai dessincronizado.
+ *
+ * Laranja, e não a azul que seria a rampa sequencial padrão: num mapa de
+ * alagamento, azul escuro é lido como lâmina d'água, não como risco alto. A
+ * rampa foi validada (matiz única, luminância monotônica, degraus visíveis,
+ * extremidade clara acima de 2:1 contra a superfície) nos dois modos.
+ */
+
+.viz-root {
+  color-scheme: light;
+  --surface-1: #fcfcfb;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --hairline: #d9d8d3;
+
+  --risk-1: #eca071;
+  --risk-2: #e38044;
+  --risk-3: #d25c22;
+  --risk-4: #a84418;
+  --risk-5: #7a2e0c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) .viz-root {
+    color-scheme: dark;
+    --surface-1: #1a1a19;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --hairline: #3a3a37;
+
+    --risk-1: #f0a878;
+    --risk-2: #e68448;
+    --risk-3: #d2601f;
+    --risk-4: #a8481a;
+    --risk-5: #82370f;
+  }
+}
+
+:root[data-theme="dark"] .viz-root {
+  color-scheme: dark;
+  --surface-1: #1a1a19;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --hairline: #3a3a37;
+
+  --risk-1: #f0a878;
+  --risk-2: #e68448;
+  --risk-3: #d2601f;
+  --risk-4: #a8481a;
+  --risk-5: #82370f;
+}
+
+/* ---------- Mapa ---------- */
+
+#mapa {
+  height: 32rem;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface-1);
+}
+
+@media (max-width: 40rem) {
+  #mapa { height: 24rem; }
+}
+
+.legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1.25rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.legenda li {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* A marca colorida carrega a identidade; o texto fica em tom de texto, nunca na
+ * cor da classe — senão o rótulo herda o contraste do preenchimento. */
+.legenda .marca {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 3px;
+  border: 1px solid var(--hairline);
+  flex: none;
+}
+
+/* ---------- Painel de chuva ---------- */
+
+.painel-chuva {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: baseline;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--hairline);
+  border-radius: 6px;
+  background: var(--surface-1);
+  margin-bottom: 1rem;
+}
+
+.painel-chuva .cenario {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.painel-chuva .detalhe {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.painel-chuva .rotulo {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+}
+
+/* ---------- Popup ---------- */
+
+.leaflet-popup-content {
+  font-variant-numeric: tabular-nums;
+  margin: 0.6rem 0.8rem;
+}
+
+.leaflet-popup-content dl {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 0.15rem 0.8rem;
+  margin: 0.4rem 0 0;
+}
+
+.leaflet-popup-content dt {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.leaflet-popup-content dd {
+  margin: 0;
+  text-align: right;
+}
+
+.aviso {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+}
+
+table.classes {
+  font-variant-numeric: tabular-nums;
+}

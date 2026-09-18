@@ -103,6 +103,52 @@ def per_patch_dice(probability, label, valid, threshold: float):
     return scores
 
 
+#: Faixas de ``aoi_fraction`` usadas para decompor a métrica. A última é
+#: fechada à direita, para que o patch inteiramente dentro do município caia nela.
+AOI_BINS = ((0.0, 0.25), (0.25, 0.50), (0.50, 0.75), (0.75, 1.0))
+
+
+def by_aoi_fraction(probability, label, valid, fractions, threshold: float, bins=None):
+    """Decompõe a métrica pela fração do patch dentro do município.
+
+    Responde uma pergunta que a métrica agregada esconde: **o erro está
+    concentrado fora de Curitiba?** Importa porque o rótulo fora da divisa é
+    pior (o cadastro viário do GeoCuritiba para ali e sobra só o WorldCover) e,
+    principalmente, porque é dentro do município que o produto vale. Um Dice
+    global de 0,93 puxado para baixo por área rural de município vizinho diz
+    menos sobre o produto do que o Dice restrito ao território de interesse.
+
+    O Dice de cada faixa é acumulado sobre todos os pixels dos patches dela, não
+    é média dos Dice individuais: patch de rótulo quase vazio tem Dice instável,
+    e a média deixaria a faixa refletir esses casos em vez do desempenho real.
+    """
+    import numpy as np
+
+    bins = tuple(bins or AOI_BINS)
+    fractions = np.asarray(fractions, dtype="float64")
+    if fractions.shape[0] != probability.shape[0]:
+        raise EvaluateError(
+            f"{fractions.shape[0]} frações para {probability.shape[0]} patches"
+        )
+
+    rows = []
+    for index, (low, high) in enumerate(bins):
+        last = index == len(bins) - 1
+        selected = (fractions >= low) & (
+            (fractions <= high) if last else (fractions < high)
+        )
+        count = int(np.count_nonzero(selected))
+        entry = {"low": low, "high": high, "patches": count}
+        if count:
+            entry.update(
+                metrics_at(
+                    probability[selected], label[selected], valid[selected], threshold
+                )
+            )
+        rows.append(entry)
+    return rows
+
+
 def metrics_at(probability, label, valid, threshold: float) -> dict[str, float]:
     """Painel completo a um limiar, incluindo a matriz de confusão bruta."""
     from .loss import segmentation_metrics
@@ -231,6 +277,20 @@ def run(config: Config) -> Path:
         },
     }
 
+    aoi = [float(row["aoi_fraction"]) for row in test_rows]
+    report["test_by_aoi_fraction"] = by_aoi_fraction(
+        test_prob, test_label, test_valid, aoi, tuned
+    )
+    inside = [value >= 0.99 for value in aoi]
+    if any(inside):
+        import numpy as np
+
+        selection = np.asarray(inside)
+        report["test_inside_curitiba"] = metrics_at(
+            test_prob[selection], test_label[selection], test_valid[selection], tuned
+        )
+        report["test_inside_curitiba"]["patches"] = int(selection.sum())
+
     destination = artifacts.evaluation_report(config)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with destination.open("w", encoding="utf-8") as handle:
@@ -265,6 +325,35 @@ def _report(report, config: Config) -> None:
                 metrics["precision"],
                 metrics["recall"],
             )
+
+    logger.info("")
+    logger.info("teste decomposto pela fração do patch dentro de Curitiba:")
+    logger.info(
+        "%-14s %8s %8s %8s %12s", "faixa", "patches", "dice", "iou", "impermeável"
+    )
+    for row in report["test_by_aoi_fraction"]:
+        faixa = f"{row['low']:.0%}–{row['high']:.0%}"
+        if not row["patches"]:
+            logger.info("%-14s %8d %8s", faixa, 0, "—")
+            continue
+        logger.info(
+            "%-14s %8d %8.4f %8.4f %11.1f%%",
+            faixa,
+            row["patches"],
+            row["dice"],
+            row["iou"],
+            100 * row["positive_rate"],
+        )
+
+    if "test_inside_curitiba" in report:
+        entry = report["test_inside_curitiba"]
+        logger.info(
+            "inteiramente dentro do município: %d patches, Dice %.4f, IoU %.4f",
+            entry["patches"],
+            entry["dice"],
+            entry["iou"],
+        )
+    logger.info("")
 
     test_dice = report["test"]["tuned"]["dice"]
     val_dice = report["validation"]["tuned"]["dice"]

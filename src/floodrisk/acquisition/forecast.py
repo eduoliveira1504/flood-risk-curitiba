@@ -31,7 +31,14 @@ from typing import Any
 
 import requests
 
-from ..config import Config, ForecastConfig, RiskScenariosConfig, ScenarioTier
+from ..config import (
+    INMET_DAILY_WINDOW_H,
+    INMET_HOURLY_WINDOW_H,
+    Config,
+    ForecastConfig,
+    RiskScenariosConfig,
+    ScenarioTier,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +287,20 @@ def build_snapshot(
     """
     window = forecast_config.accumulation_window_h
     peak = series.max_accumulation(window)
-    tier: ScenarioTier = scenarios.classify(peak)
+
+    # Os dois critérios do INMET, avaliados nas janelas que os definem.
+    hourly_peak = series.max_accumulation(INMET_HOURLY_WINDOW_H)
+    daily_peak = series.max_accumulation(INMET_DAILY_WINDOW_H)
+    tier: ScenarioTier = scenarios.classify(hourly_peak, daily_peak)
+
+    # Qual critério puxou o cenário. Vai para o site porque "chuva forte" sem
+    # dizer se é intensidade ou volume não ajuda ninguém a decidir nada.
+    if tier.hourly_mm > 0 and hourly_peak >= tier.hourly_mm:
+        triggered_by = "intensidade horária"
+    elif tier.daily_mm > 0:
+        triggered_by = "acumulado em 24 h"
+    else:
+        triggered_by = "nenhum critério atingido"
 
     return {
         "generated_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -291,11 +311,28 @@ def build_snapshot(
         "timezone": series.timezone,
         "accumulation_window_h": window,
         "peak_accumulation_mm": round(peak, 2),
+        "peak_hourly_mm": round(hourly_peak, 2),
+        "peak_daily_mm": round(daily_peak, 2),
         "total_mm": round(series.total_mm, 2),
-        "scenario": {"name": tier.name, "label": tier.label, "min_mm": tier.min_mm},
+        "scenario": {
+            "name": tier.name,
+            "label": tier.label,
+            "hourly_mm": tier.hourly_mm,
+            "daily_mm": tier.daily_mm,
+            "inmet_alert": tier.inmet_alert,
+            "triggered_by": triggered_by,
+        },
         "scenario_tiers": [
-            {"name": t.name, "label": t.label, "min_mm": t.min_mm} for t in scenarios.tiers
+            {
+                "name": t.name,
+                "label": t.label,
+                "hourly_mm": t.hourly_mm,
+                "daily_mm": t.daily_mm,
+                "inmet_alert": t.inmet_alert,
+            }
+            for t in scenarios.tiers
         ],
+        "scenario_source": scenarios.source,
         "justification_pending": scenarios.justification_pending,
         "hourly": {
             "time": series.times,
@@ -329,10 +366,20 @@ def acquire(config: Config) -> Path:
     )
 
     snapshot = build_snapshot(series, config.risk_scenarios, config.forecast)
-    logger.info("cenário selecionado: %s", snapshot["scenario"]["label"])
+    logger.info(
+        "pico horário %.1f mm/h · pico em 24 h %.1f mm",
+        snapshot["peak_hourly_mm"],
+        snapshot["peak_daily_mm"],
+    )
+    logger.info(
+        "cenário selecionado: %s (%s, aviso INMET %s)",
+        snapshot["scenario"]["label"],
+        snapshot["scenario"]["triggered_by"],
+        snapshot["scenario"]["inmet_alert"],
+    )
     if snapshot["justification_pending"]:
         logger.warning(
-            "patamares de chuva ainda sem justificativa na literatura "
+            "patamares de chuva ainda sem procedência declarada "
             "(risk_scenarios.justification_pending = true)"
         )
 

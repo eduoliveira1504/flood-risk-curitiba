@@ -140,6 +140,27 @@ def _stage_evaluate(config: Config) -> None:
     evaluate.run(config)
 
 
+def _stage_infer(config: Config) -> None:
+    """Aplica a U-Net ao mosaico inteiro, com mistura ponderada entre janelas."""
+    from .model import infer
+
+    infer.run(config)
+
+
+def _stage_susceptibility(config: Config) -> None:
+    """Compõe o índice de suscetibilidade na grade zonal."""
+    from .features import susceptibility
+
+    susceptibility.build(config)
+
+
+def _stage_report(config: Config) -> None:
+    """Prepara os dados que o site publicado consome."""
+    from . import report
+
+    report.build(config)
+
+
 def _stage_info(config: Config) -> None:
     """Imprime um resumo da configuração efetiva e do estado dos artefatos."""
     from .geo import aoi_geometry
@@ -262,10 +283,25 @@ STAGES: tuple[Stage, ...] = (
         "Gasta o conjunto de teste: Dice, IoU, matriz de confusão e figura de erros",
         _stage_evaluate,
     ),
-    Stage("infer", 3, "Aplica o modelo à cidade inteira"),
+    Stage(
+        "infer",
+        3,
+        "Aplica o modelo à cidade inteira, costurando as janelas sem emenda",
+        _stage_infer,
+    ),
     # -- Fase 4: produto --------------------------------------------------- #
-    Stage("susceptibility", 4, "Compõe o índice de suscetibilidade na grade zonal"),
-    Stage("report", 4, "Gera figuras e tabelas para o documento e o dashboard"),
+    Stage(
+        "susceptibility",
+        4,
+        "Compõe o índice de suscetibilidade na grade zonal",
+        _stage_susceptibility,
+    ),
+    Stage(
+        "report",
+        4,
+        "Prepara os dados do site (camada compacta, previsão e métricas)",
+        _stage_report,
+    ),
 )
 
 STAGES_BY_NAME: dict[str, Stage] = {stage.name: stage for stage in STAGES}

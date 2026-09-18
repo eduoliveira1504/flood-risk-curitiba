@@ -123,3 +123,12 @@ tmp/
 temp/
 cache/
 *.log
+
+# ---------- Site publicado ----------
+# As regras acima ignoram *.geojson em qualquer lugar, o que é certo para dados
+# de trabalho e errado para o site: o GitHub Pages serve arquivos estáticos do
+# repositório, então a camada do mapa PRECISA estar versionada. As exceções
+# valem porque nem `site/` nem `docs/` são diretórios ignorados — o git desce
+# neles e aplica a reinclusão.
+!site/data/*.geojson
+!docs/**/*.geojson

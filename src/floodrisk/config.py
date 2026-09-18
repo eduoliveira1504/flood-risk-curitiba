@@ -131,12 +131,24 @@ class RasterConfig:
     patch_size: int
     patch_overlap: int
     min_valid_fraction: float
+    inference_overlap: int
 
     def __post_init__(self) -> None:
         if self.patch_overlap >= self.patch_size:
             raise ConfigError("'raster.patch_overlap' precisa ser menor que 'patch_size'")
         if not 0.0 <= self.min_valid_fraction <= 1.0:
             raise ConfigError("'raster.min_valid_fraction' precisa estar em [0, 1]")
+        if not 0 <= self.inference_overlap < self.patch_size:
+            raise ConfigError(
+                "'raster.inference_overlap' precisa estar em [0, patch_size) — "
+                "sobreposição igual ao patch faria a janela não avançar."
+            )
+        if self.inference_overlap < self.patch_overlap:
+            raise ConfigError(
+                "'raster.inference_overlap' menor que 'patch_overlap' não faz "
+                "sentido: a inferência precisa de MAIS sobreposição que o treino "
+                "para que a média ponderada apague a costura entre janelas."
+            )
 
     @property
     def stride(self) -> int:
@@ -147,6 +159,13 @@ class RasterConfig:
 @dataclass(frozen=True)
 class GridConfig:
     cell_size_m: float
+    min_valid_fraction: float
+
+    def __post_init__(self) -> None:
+        if self.cell_size_m <= 0:
+            raise ConfigError("'grid.cell_size_m' precisa ser positivo")
+        if not 0.0 < self.min_valid_fraction <= 1.0:
+            raise ConfigError("'grid.min_valid_fraction' precisa estar em (0, 1]")
 
 
 @dataclass(frozen=True)
@@ -473,46 +492,74 @@ class ForecastConfig:
 
 @dataclass(frozen=True)
 class ScenarioTier:
-    """Patamar de chuva que seleciona uma camada de risco pré-materializada."""
+    """Patamar de chuva que seleciona uma camada de risco pré-materializada.
+
+    Dois limiares, como nos critérios do INMET, porque alagamento urbano
+    responde a intensidade e não só a volume: 30 mm em 1 h alaga, os mesmos
+    30 mm espalhados por 24 h não. Um número só não distingue os dois casos.
+    """
 
     name: str
-    min_mm: float
     label: str
+    hourly_mm: float
+    daily_mm: float
+    inmet_alert: str
 
     def __post_init__(self) -> None:
-        if self.min_mm < 0:
-            raise ConfigError(f"'risk_scenarios' tier '{self.name}': min_mm negativo")
+        for field_name in ("hourly_mm", "daily_mm"):
+            if getattr(self, field_name) < 0:
+                raise ConfigError(
+                    f"'risk_scenarios' tier '{self.name}': {field_name} negativo"
+                )
+
+
+#: Janelas de acumulação dos critérios do INMET. Não são parâmetro livre — são
+#: a definição do critério, então ficam no código e não no YAML.
+INMET_HOURLY_WINDOW_H = 1
+INMET_DAILY_WINDOW_H = 24
 
 
 @dataclass(frozen=True)
 class RiskScenariosConfig:
     tiers: list[ScenarioTier]
     justification_pending: bool
+    source: str
 
     def __post_init__(self) -> None:
         if len(self.tiers) < 2:
             raise ConfigError("'risk_scenarios.tiers': precisa de ao menos dois patamares")
-        if self.tiers[0].min_mm != 0.0:
+        if not self.source.strip():
             raise ConfigError(
-                "'risk_scenarios.tiers': o primeiro patamar precisa começar em 0 mm, "
-                "senão existe acumulado sem cenário atribuído."
+                "'risk_scenarios.source': informe a procedência dos patamares. "
+                "Corte de chuva sem fonte citável é o que a banca vai perguntar."
             )
-        thresholds = [tier.min_mm for tier in self.tiers]
-        if thresholds != sorted(thresholds) or len(set(thresholds)) != len(thresholds):
+        first = self.tiers[0]
+        if first.hourly_mm != 0.0 or first.daily_mm != 0.0:
             raise ConfigError(
-                "'risk_scenarios.tiers': min_mm precisa ser estritamente crescente"
+                "'risk_scenarios.tiers': o primeiro patamar precisa começar em 0 mm "
+                "nos dois critérios, senão existe chuva sem cenário atribuído."
             )
+        for label in ("hourly_mm", "daily_mm"):
+            values = [getattr(tier, label) for tier in self.tiers]
+            if values != sorted(values) or len(set(values)) != len(values):
+                raise ConfigError(
+                    f"'risk_scenarios.tiers': {label} precisa ser estritamente "
+                    "crescente — senão a classificação por esse critério é ambígua."
+                )
 
-    def classify(self, accumulated_mm: float) -> ScenarioTier:
-        """Devolve o patamar correspondente a um acumulado, em mm."""
-        if accumulated_mm < 0:
+    def classify(self, hourly_mm: float, daily_mm: float) -> ScenarioTier:
+        """Patamar correspondente, pelo critério mais severo dos dois.
+
+        Vale o maior patamar atingido por QUALQUER um dos critérios, que é como
+        o INMET opera o "ou" dos seus avisos. Como os dois limiares crescem
+        junto com o patamar, basta guardar o último que passou.
+        """
+        if hourly_mm < 0 or daily_mm < 0:
             raise ValueError("acumulado não pode ser negativo")
         chosen = self.tiers[0]
         for tier in self.tiers:
-            if accumulated_mm >= tier.min_mm:
+            if hourly_mm >= tier.hourly_mm or daily_mm >= tier.daily_mm:
                 chosen = tier
-            else:
-                break
         return chosen
 
 

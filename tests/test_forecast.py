@@ -239,17 +239,39 @@ def test_archive_uses_the_archive_endpoint(config):
 
 def test_classify_picks_the_highest_tier_reached(config):
     scenarios = config.risk_scenarios
-    assert scenarios.classify(0.0).name == "leve"
-    assert scenarios.classify(19.9).name == "leve"
-    assert scenarios.classify(20.0).name == "forte"
-    assert scenarios.classify(39.9).name == "forte"
-    assert scenarios.classify(40.0).name == "critica"
-    assert scenarios.classify(500.0).name == "critica"
+    assert scenarios.classify(0.0, 0.0).name == "leve"
+    assert scenarios.classify(19.9, 49.9).name == "leve"
+    assert scenarios.classify(20.0, 0.0).name == "forte"
+    assert scenarios.classify(0.0, 50.0).name == "forte"
+    assert scenarios.classify(60.0, 0.0).name == "critica"
+    assert scenarios.classify(0.0, 100.0).name == "critica"
+
+
+def test_either_criterion_alone_can_raise_the_scenario(config):
+    """É o "ou" do INMET: 30 mm numa hora é crítico mesmo sem volume no dia."""
+    scenarios = config.risk_scenarios
+    assert scenarios.classify(70.0, 10.0).name == "critica"
+    assert scenarios.classify(2.0, 120.0).name == "critica"
+
+
+def test_volume_spread_over_a_day_is_not_the_same_as_intensity(config):
+    """120 mm espalhados em 24 h sem pico horário não é o mesmo que 120 mm em 2 h.
+
+    É exatamente a distinção que um limiar único não conseguia fazer, e a razão
+    de o INMET publicar dois critérios.
+    """
+    scenarios = config.risk_scenarios
+    gentle = scenarios.classify(5.0, 40.0)
+    intense = scenarios.classify(65.0, 40.0)
+    assert gentle.name == "leve"
+    assert intense.name == "critica"
 
 
 def test_classify_rejects_negative(config):
     with pytest.raises(ValueError):
-        config.risk_scenarios.classify(-1.0)
+        config.risk_scenarios.classify(-1.0, 0.0)
+    with pytest.raises(ValueError):
+        config.risk_scenarios.classify(0.0, -1.0)
 
 
 def test_snapshot_carries_attribution_and_resolved_scenario(config):
@@ -265,10 +287,32 @@ def test_snapshot_carries_attribution_and_resolved_scenario(config):
     assert snapshot["generated_at"].endswith("Z")
 
 
-def test_snapshot_flags_pending_justification(config):
-    """Enquanto os patamares não tiverem base na literatura, o site precisa saber."""
+def test_snapshot_carries_the_provenance_of_the_thresholds(config):
+    """O site precisa poder citar a fonte do corte, não só mostrar o número."""
     snapshot = build_snapshot(series_of([1.0] * 5), config.risk_scenarios, config.forecast)
-    assert snapshot["justification_pending"] is True
+    assert snapshot["justification_pending"] is False
+    assert "INMET" in snapshot["scenario_source"]
+
+
+def test_snapshot_reports_both_peaks_and_which_one_triggered(config):
+    """Uma hora de 25 mm, sem volume no dia: o cenário vem da intensidade."""
+    snapshot = build_snapshot(
+        series_of([0.0] * 5 + [25.0] + [0.0] * 30), config.risk_scenarios, config.forecast
+    )
+    assert snapshot["peak_hourly_mm"] == pytest.approx(25.0)
+    assert snapshot["scenario"]["name"] == "forte"
+    assert snapshot["scenario"]["triggered_by"] == "intensidade horária"
+
+
+def test_a_long_drizzle_is_triggered_by_the_daily_criterion(config):
+    """60 mm em 24 h sem nenhuma hora forte: o cenário vem do volume."""
+    snapshot = build_snapshot(
+        series_of([2.5] * 24), config.risk_scenarios, config.forecast
+    )
+    assert snapshot["peak_hourly_mm"] == pytest.approx(2.5)
+    assert snapshot["peak_daily_mm"] == pytest.approx(60.0)
+    assert snapshot["scenario"]["name"] == "forte"
+    assert snapshot["scenario"]["triggered_by"] == "acumulado em 24 h"
 
 
 def test_write_snapshot_creates_parents_and_valid_json(config, tmp_path):

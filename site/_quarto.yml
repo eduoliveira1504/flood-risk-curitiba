@@ -1,0 +1,41 @@
+# Site publicado no GitHub Pages. Renderiza para ../docs, que é a pasta que o
+# Pages serve direto da branch main — sem branch gh-pages e sem Action.
+project:
+  type: website
+  output-dir: ../docs
+  resources:
+    # Os dados vêm do estágio `report`; sem isto o Quarto não os copia e o mapa
+    # sobe apontando para arquivos que não existem.
+    - data/**
+
+website:
+  title: "Suscetibilidade a alagamento — Curitiba"
+  description: >
+    Mapa de suscetibilidade a alagamento urbano em Curitiba, construído a partir
+    de segmentação de superfície impermeável por rede neural e declividade do
+    terreno.
+  navbar:
+    left:
+      - href: index.qmd
+        text: Mapa
+      - href: metodologia.qmd
+        text: Metodologia
+    right:
+      - icon: github
+        href: https://github.com/eduoliveira1504/flood-risk-curitiba
+        aria-label: Repositório no GitHub
+  page-footer:
+    center: |
+      Trabalho de Conclusão de Curso — Ciência de Dados para Negócios, FAE Centro Universitário.
+      Dados: Copernicus Sentinel-2 (ESA), ESA WorldCover, Copernicus DEM GLO-30,
+      GeoCuritiba/IPPUC, IBGE e Open-Meteo (CC-BY 4.0).
+
+format:
+  html:
+    theme:
+      light: cosmo
+      dark: darkly
+    css: styles.css
+    toc: true
+    toc-title: Nesta página
+    lang: pt-BR

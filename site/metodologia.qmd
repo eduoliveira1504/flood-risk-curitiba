@@ -1,0 +1,213 @@
+---
+title: "Metodologia"
+subtitle: "Como o mapa foi construído, e o que ele não diz"
+---
+
+::: {.viz-root}
+
+## O que o mapa mede
+
+Alagamento urbano acontece onde muita água é gerada e pouca gravidade a leva
+embora. Superfície impermeável — asfalto, telhado, calçada — determina quanta
+chuva vira escoamento em vez de infiltrar no solo. Declividade determina se essa
+água permanece ou desce. Uma área impermeável numa ladeira não alaga ali:
+transfere o problema para baixo. Uma área permeável e plana absorve.
+
+O índice é o **produto** dos dois fatores, não a soma. Numa soma, uma célula
+íngreme e totalmente selada empataria com uma plana e semipermeável, que são
+situações fisicamente distintas. No produto, um fator próximo de zero zera o
+resultado, que é o comportamento correto.
+
+<div id="composicao"></div>
+
+## De onde vêm os dados
+
+| Camada | Fonte | Papel |
+|---|---|---|
+| Imagem óptica | Copernicus Sentinel-2 L2A, mediana de 2024 | Entrada da rede neural |
+| Superfície construída | ESA WorldCover 2021 v200 | Rótulo de treino |
+| Malha viária | GeoCuritiba / IPPUC | Complementa o rótulo nas vias |
+| Elevação | Copernicus DEM GLO-30 | Origem da declividade |
+| Limite municipal | Malhas municipais do IBGE | Recorte do produto |
+| Chuva | Open-Meteo (CC-BY 4.0) | Cenário exibido ao lado do mapa |
+
+A imagem é uma **mediana temporal** de todas as cenas de 2024 com menos de 20% de
+nuvem, com as classes de nuvem e sombra descartadas pixel a pixel antes da
+composição. Mediana e não média: uma nuvem residual que escape do filtro desloca
+a média e não desloca a mediana.
+
+## Como a impermeabilidade é estimada
+
+Uma rede U-Net com encoder ResNet34 segmenta superfície impermeável a partir de
+quatro bandas do Sentinel-2. O treino usa recortes de 128 × 128 pixels
+(1.280 metros de lado) e as métricas abaixo vêm de um conjunto de teste que o
+modelo nunca viu durante o treino nem durante a escolha de hiperparâmetros.
+
+<div id="metricas-modelo"></div>
+
+### O split é espacial, e é espacial de verdade
+
+Dividir recortes aleatoriamente entre treino e teste é o erro clássico em
+sensoriamento remoto: dois recortes vizinhos compartilham pixels e contexto, e a
+métrica de teste passa a medir memorização em vez de generalização.
+
+Aqui o território é dividido em blocos, e a regra é mais forte do que "cada bloco
+vai para um conjunto": **um recorte só é aceito se todos os blocos que sua área
+toca pertencerem ao mesmo conjunto**. Com isso a ausência de vazamento é
+demonstrável — se um recorte de treino e um de teste se sobrepusessem, o ponto em
+comum estaria num bloco simultaneamente de treino e de teste, o que é impossível
+por construção. O preço é uma faixa descartada em volta de cada divisa.
+
+<div id="metricas-split"></div>
+
+### Desempenho estável em dois regimes de cobertura
+
+O conjunto de teste abrange desde periferia metropolitana até tecido urbano
+consolidado — territórios com proporções de superfície selada muito diferentes.
+Como a métrica Dice tende a subir com a prevalência da classe positiva, manter o
+desempenho na faixa de baixa cobertura é o indício de generalização que interessa.
+
+<div id="metricas-cobertura"></div>
+
+## Os cenários de chuva
+
+Os patamares não foram escolhidos por este trabalho: são os critérios de **Aviso
+Meteorológico para chuvas intensas do INMET**, a régua usada para emitir alerta à
+população brasileira. Adotá-los troca uma decisão do autor por um critério
+normativo verificável.
+
+<div id="tabela-cenarios"></div>
+
+São **dois critérios, e vale o mais severo** — como no próprio INMET. Alagamento
+urbano responde à intensidade e não apenas ao volume: 30 mm em uma hora alagam,
+os mesmos 30 mm espalhados por 24 horas não. Um limiar único não distingue os
+dois casos.
+
+## Limitações
+
+Estas são as fronteiras do que o mapa sustenta. Lê-lo além delas leva a conclusões
+que o método não autoriza.
+
+**A métrica mede concordância com o WorldCover, não acurácia contra campo.** O
+rótulo de treino é derivado do ESA WorldCover, que por sua vez é produto de um
+classificador automático sobre imagens de satélite. O Dice reportado diz o quanto
+a rede reproduz esse rótulo — não o quanto acerta a realidade do terreno. Uma
+validação contra levantamento de campo ou cadastro de uso do solo continua em
+aberto.
+
+**A chuva não recalibra o mapa.** Sem uma base de ocorrências registradas de
+alagamento não há como calibrar a relação entre milímetros acumulados e área
+efetivamente alagada. Qualquer peso atribuído aqui — "cenário crítico vale o dobro
+do forte" — seria arbitrário, e arbitrariedade disfarçada de modelo é pior do que
+sua ausência declarada. Por isso o índice é estático e o cenário de chuva aparece
+ao lado, para leitura conjunta. Obter a base de ocorrências da Defesa Civil
+municipal é o próximo passo natural do trabalho, e destrava tanto essa calibração
+quanto uma validação independente do índice.
+
+**A declividade vem de um modelo de 30 metros.** O Copernicus DEM GLO-30 foi
+reamostrado para 10 metros para alinhar com a grade da imagem. Isso alinha, não
+cria detalhe: a declividade carrega informação de 30 metros.
+
+**A célula de 200 metros é a menor unidade de leitura.** Dentro dela, uma quadra
+densa e uma praça entram na mesma média. O mapa não sustenta leitura por lote nem
+por rua.
+
+**O índice é relativo a Curitiba.** As faixas são quintis do próprio município,
+então "muito alta" significa "entre as 20% mais suscetíveis desta cidade" — não um
+patamar absoluto comparável com outro município.
+
+## Reprodutibilidade
+
+Todo o pipeline é código versionado, dividido em estágios independentes que leem e
+escrevem arquivos em disco. Os parâmetros ficam num único arquivo de configuração,
+e a divisão dos dados — inclusive a semente efetiva e o critério que a selecionou —
+fica registrada junto dos resultados.
+
+O [repositório](https://github.com/eduoliveira1504/flood-risk-curitiba) traz as
+instruções de execução.
+
+:::
+
+<script type="module">
+const numero = (valor, casas = 1) =>
+  valor === undefined || valor === null
+    ? '—'
+    : valor.toLocaleString('pt-BR', {
+        minimumFractionDigits: casas, maximumFractionDigits: casas,
+      });
+
+const metricas = await (await fetch('data/metrics.json')).json();
+
+// Nenhum número deste documento é digitado à mão: todos vêm do pipeline, para
+// que nada fique desatualizado em silêncio depois de um retreino.
+const modelo = metricas.model;
+if (modelo) {
+  document.getElementById('metricas-modelo').innerHTML = `
+    <table class="table">
+      <tbody>
+        <tr><th>Arquitetura</th><td>U-Net, encoder ${modelo.encoder}</td></tr>
+        <tr><th>Recorte</th><td>${modelo.patch_size} × ${modelo.patch_size} px (${modelo.patch_size * 10} m)</td></tr>
+        <tr><th>Dice (teste)</th><td>${numero(modelo.test_dice, 4)}</td></tr>
+        <tr><th>IoU (teste)</th><td>${numero(modelo.test_iou, 4)}</td></tr>
+        <tr><th>Precisão / Recall</th><td>${numero(modelo.test_precision, 4)} / ${numero(modelo.test_recall, 4)}</td></tr>
+        <tr><th>Dice (validação)</th><td>${numero(modelo.validation_dice, 4)}</td></tr>
+        <tr><th>Limiar</th><td>${numero(modelo.threshold, 2)} — calibrado na validação, aplicado ao teste sem reajuste</td></tr>
+      </tbody>
+    </table>`;
+}
+
+const split = metricas.split;
+if (split) {
+  const p = split.patches ?? {};
+  document.getElementById('metricas-split').innerHTML = `
+    <table class="table">
+      <tbody>
+        <tr><th>Estratégia</th><td>${split.strategy}</td></tr>
+        <tr><th>Bloco</th><td>${numero(split.block_size_m, 0)} m</td></tr>
+        <tr><th>Recortes</th><td>${p.train ?? '—'} treino · ${p.val ?? '—'} validação · ${p.test ?? '—'} teste</td></tr>
+        <tr><th>Semente</th><td>${split.chosen_seed}</td></tr>
+        <tr><th>Desbalanceamento</th><td>${numero(split.prevalence_spread_pp, 2)} p.p. entre conjuntos</td></tr>
+      </tbody>
+    </table>`;
+}
+
+const cobertura = modelo?.by_coverage;
+if (cobertura?.length) {
+  document.getElementById('metricas-cobertura').innerHTML = `
+    <table class="table">
+      <thead><tr><th>Dentro do município</th><th>Recortes</th><th>Impermeável</th><th>Dice</th></tr></thead>
+      <tbody>${cobertura.map((r) => `
+        <tr>
+          <td>${numero(r.low * 100, 0)}–${numero(r.high * 100, 0)}%</td>
+          <td>${r.patches}</td>
+          <td>${numero(r.positive_rate * 100)}%</td>
+          <td>${numero(r.dice, 4)}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+const cenarios = metricas.scenarios;
+if (cenarios?.tiers?.length) {
+  document.getElementById('tabela-cenarios').innerHTML = `
+    <table class="table">
+      <thead><tr><th>Cenário</th><th>Intensidade</th><th>Acumulado em 24 h</th><th>Aviso INMET</th></tr></thead>
+      <tbody>${cenarios.tiers.map((t) => `
+        <tr>
+          <td>${t.label}</td>
+          <td>${t.hourly_mm > 0 ? `≥ ${numero(t.hourly_mm, 0)} mm/h` : '—'}</td>
+          <td>${t.daily_mm > 0 ? `≥ ${numero(t.daily_mm, 0)} mm` : '—'}</td>
+          <td>${t.inmet_alert}</td>
+        </tr>`).join('')}</tbody>
+    </table>
+    <p class="aviso">Fonte: ${cenarios.source}</p>`;
+}
+
+const grade = metricas.grid;
+if (grade) {
+  document.getElementById('composicao').innerHTML = `
+    <p class="aviso">
+      Agregação em células de ${numero(grade.cell_size_m, 0)} m, classificadas em
+      ${grade.classes.length} faixas por quintil do índice.
+    </p>`;
+}
+</script>

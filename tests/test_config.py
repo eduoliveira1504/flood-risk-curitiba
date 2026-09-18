@@ -130,22 +130,52 @@ def test_empty_attribution_is_rejected(raw):
 
 def test_scenario_tiers_must_start_at_zero(raw):
     data = copy.deepcopy(raw)
-    data["risk_scenarios"]["tiers"][0]["min_mm"] = 5.0
+    data["risk_scenarios"]["tiers"][0]["daily_mm"] = 5.0
+    with pytest.raises(ConfigError, match="0 mm"):
+        build(data)
+
+
+def test_both_criteria_must_start_at_zero(raw):
+    data = copy.deepcopy(raw)
+    data["risk_scenarios"]["tiers"][0]["hourly_mm"] = 1.0
     with pytest.raises(ConfigError, match="0 mm"):
         build(data)
 
 
 def test_scenario_tiers_must_be_increasing(raw):
     data = copy.deepcopy(raw)
-    data["risk_scenarios"]["tiers"][2]["min_mm"] = 10.0
+    data["risk_scenarios"]["tiers"][2]["daily_mm"] = 10.0
     with pytest.raises(ConfigError, match="crescente"):
         build(data)
 
 
-def test_scenario_justification_still_pending(raw):
-    """Trocar para false só quando os cortes tiverem base em Lohmann & Santos (2021)."""
+def test_the_hourly_criterion_must_be_increasing_too(raw):
+    """Os dois critérios são independentes; um deles fora de ordem já é ambíguo."""
+    data = copy.deepcopy(raw)
+    data["risk_scenarios"]["tiers"][2]["hourly_mm"] = 1.0
+    with pytest.raises(ConfigError, match="crescente"):
+        build(data)
+
+
+def test_scenario_thresholds_now_have_provenance(raw):
+    """Os patamares saíram dos critérios de aviso do INMET, não de opinião."""
     config = build(copy.deepcopy(raw))
-    assert config.risk_scenarios.justification_pending is True
+    assert config.risk_scenarios.justification_pending is False
+    assert "INMET" in config.risk_scenarios.source
+
+
+def test_an_empty_source_is_rejected(raw):
+    data = copy.deepcopy(raw)
+    data["risk_scenarios"]["source"] = "   "
+    with pytest.raises(ConfigError, match="source"):
+        build(data)
+
+
+def test_the_thresholds_match_the_inmet_criteria(raw):
+    """20/50 e 60/100 mm são a régua oficial; mudá-los exige trocar a fonte."""
+    tiers = {t.name: t for t in build(copy.deepcopy(raw)).risk_scenarios.tiers}
+    assert (tiers["forte"].hourly_mm, tiers["forte"].daily_mm) == (20.0, 50.0)
+    assert (tiers["critica"].hourly_mm, tiers["critica"].daily_mm) == (60.0, 100.0)
 
 
 def test_occurrences_target_still_undefined(raw):
