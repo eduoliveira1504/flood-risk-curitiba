@@ -1,0 +1,114 @@
+{
+  "project": "flood-risk-curitiba",
+  "model": {
+    "encoder": "resnet34",
+    "patch_size": 128,
+    "threshold": 0.49,
+    "test_dice": 0.9312,
+    "test_iou": 0.8712,
+    "test_precision": 0.9149,
+    "test_recall": 0.948,
+    "validation_dice": 0.9271,
+    "by_coverage": [
+      {
+        "low": 0.0,
+        "high": 0.25,
+        "patches": 38,
+        "dice": 0.9229,
+        "positive_rate": 0.237
+      },
+      {
+        "low": 0.25,
+        "high": 0.5,
+        "patches": 1,
+        "dice": 0.8798,
+        "positive_rate": 0.1169
+      },
+      {
+        "low": 0.75,
+        "high": 1.0,
+        "patches": 33,
+        "dice": 0.9347,
+        "positive_rate": 0.6855
+      }
+    ]
+  },
+  "split": {
+    "strategy": "spatial_block",
+    "block_size_m": 5120,
+    "patches": {
+      "test": 72,
+      "train": 350,
+      "val": 61
+    },
+    "chosen_seed": 150,
+    "prevalence_spread_pp": 3.642
+  },
+  "scenarios": {
+    "source": "INMET — critérios de Aviso Meteorológico para chuvas intensas",
+    "tiers": [
+      {
+        "name": "leve",
+        "label": "Chuva leve",
+        "hourly_mm": 0.0,
+        "daily_mm": 0.0,
+        "inmet_alert": "sem aviso"
+      },
+      {
+        "name": "forte",
+        "label": "Chuva forte",
+        "hourly_mm": 20.0,
+        "daily_mm": 50.0,
+        "inmet_alert": "amarelo/laranja"
+      },
+      {
+        "name": "critica",
+        "label": "Chuva crítica",
+        "hourly_mm": 60.0,
+        "daily_mm": 100.0,
+        "inmet_alert": "vermelho"
+      }
+    ]
+  },
+  "grid": {
+    "cell_size_m": 200,
+    "classes": [
+      "muito baixa",
+      "baixa",
+      "média",
+      "alta",
+      "muito alta"
+    ],
+    "properties": {
+      "class_index": "c",
+      "susceptibility": "s",
+      "impervious_mean": "i",
+      "slope_mean_deg": "d"
+    }
+  },
+  "attribution": {
+    "forecast": "Dados meteorológicos: Open-Meteo.com (CC-BY 4.0)",
+    "sentinel": "Copernicus Sentinel-2 L2A (ESA / CDSE)",
+    "worldcover": "ESA WorldCover 2021 v200",
+    "dem": "Copernicus DEM GLO-30",
+    "streets": "GeoCuritiba / IPPUC — Prefeitura de Curitiba",
+    "boundary": "Malhas municipais IBGE"
+  },
+  "basemap": {
+    "file": "sentinel_rgb.jpg",
+    "bounds": [
+      [
+        -25.658484088939403,
+        -49.40016363472978
+      ],
+      [
+        -25.341478816730323,
+        -49.17928268064348
+      ]
+    ],
+    "width": 1288,
+    "height": 2047,
+    "source": "Copernicus Sentinel-2 L2A — mediana temporal",
+    "period": "2024-01-01 a 2024-12-31"
+  }
+}
