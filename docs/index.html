@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>Suscetibilidade a alagamento em Curitiba – Suscetibilidade a alagamento — Curitiba</title>
+<title>Painel — Suscetibilidade a alagamento em Curitiba – Suscetibilidade a alagamento — Curitiba</title>
 <style>
 /* Default styles provided by pandoc.
 ** See https://pandoc.org/MANUAL.html#variables-for-html for config info.
@@ -82,7 +82,7 @@ ul.task-list li input[type="checkbox"] {
 <link rel="stylesheet" href="styles.css">
 </head>
 
-<body class="nav-fixed quarto-light"><script id="quarto-html-before-body" type="application/javascript">
+<body class="nav-fixed fullcontent quarto-light"><script id="quarto-html-before-body" type="application/javascript">
     const toggleBodyColorMode = (bsSheetEl) => {
       const mode = bsSheetEl.getAttribute("data-mode");
       const bodyEl = window.document.querySelector("body");
@@ -263,7 +263,7 @@ ul.task-list li input[type="checkbox"] {
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
     <a class="nav-link active" href="./index.html" aria-current="page"> 
-<span class="menu-text">Mapa</span></a>
+<span class="menu-text">Painel</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link" href="./metodologia.html"> 
@@ -285,93 +285,105 @@ ul.task-list li input[type="checkbox"] {
     </nav>
 </header>
 <!-- content -->
-<div id="quarto-content" class="quarto-container page-columns page-rows-contents page-layout-article page-navbar">
+<div id="quarto-content" class="quarto-container page-layout-custom page-navbar">
 <!-- sidebar -->
 <!-- margin-sidebar -->
-    <div id="quarto-margin-sidebar" class="sidebar margin-sidebar zindex-bottom">
-        
-    </div>
 <!-- main -->
-<main class="content" id="quarto-document-content">
-
-
-<header id="title-block-header" class="quarto-title-block default">
-<div class="quarto-title">
-<h1 class="title">Suscetibilidade a alagamento em Curitiba</h1>
-<p class="subtitle lead">Onde a chuva encontra superfície impermeável em terreno plano</p>
-</div>
 
 
 
-<div class="quarto-title-meta">
 
-    
-  
-    
+
+<div class="viz-root dash" id="dash">
+
+<div class="dash-topo">
+  <div>
+    <h1>Suscetibilidade a alagamento · Curitiba</h1>
+    <p class="dash-sub" id="escopo">Município inteiro</p>
   </div>
-  
+  <div class="dash-filtros">
+    <label for="filtro-bacia">Bacia</label>
+    <select id="filtro-bacia"><option value="-1">Todas</option></select>
+    <button type="button" id="limpar" hidden="">Limpar filtros</button>
+  </div>
+</div>
 
+<div class="kpis" aria-label="Indicadores">
+  <div class="kpi" id="kpi-previsao">
+    <span class="kpi-rotulo">Chuva prevista · 48 h</span>
+    <span class="kpi-valor" data-v="">…</span>
+    <span class="kpi-nota" data-n="">carregando</span>
+  </div>
+  <div class="kpi" id="kpi-recente">
+    <span class="kpi-rotulo">Maior chuva · 7 dias</span>
+    <span class="kpi-valor" data-v="">…</span>
+    <span class="kpi-nota" data-n="">carregando</span>
+  </div>
+  <div class="kpi" id="kpi-imp">
+    <span class="kpi-rotulo">Superfície impermeável</span>
+    <span class="kpi-valor" data-v="">…</span>
+    <span class="kpi-nota" data-n=""></span>
+  </div>
+  <div class="kpi" id="kpi-area">
+    <span class="kpi-rotulo">Área analisada</span>
+    <span class="kpi-valor" data-v="">…</span>
+    <span class="kpi-nota" data-n=""></span>
+  </div>
+  <div class="kpi" id="kpi-modelo">
+    <span class="kpi-rotulo">Concordância do modelo</span>
+    <span class="kpi-valor" data-v="">…</span>
+    <span class="kpi-nota" data-n=""></span>
+  </div>
+</div>
 
-</header>
+<div class="dash-corpo">
+  <div class="cartao cartao-mapa">
+    <div id="mapa" role="img" aria-label="Mapa de suscetibilidade a alagamento em Curitiba, em cinco faixas"></div>
+  </div>
 
+  <div class="dash-lateral">
+    <div class="cartao">
+      <h2>Faixas de suscetibilidade <small>clique para marcar uma ou mais</small></h2>
+      <div id="faixas"></div>
+    </div>
+    <div class="cartao">
+      <h2>Bacias hidrográficas <small>% da área em faixa muito alta</small></h2>
+      <div id="bacias" class="barras"></div>
+    </div>
+    <div class="cartao" id="cartao-bairros" hidden="">
+      <h2>Bairros mais críticos <small>% da área em faixa muito alta</small></h2>
+      <div id="bairros" class="barras barras-2col"></div>
+    </div>
+    <div class="cartao cartao-chuva">
+      <h2>Chuva hora a hora <small id="chuva-origem"></small></h2>
+      <div class="chuva-area"><div id="chuva-grafico" class="chuva-grafico"></div><div id="chuva-dica" class="chuva-dica" hidden=""></div></div>
+      <p class="chuva-leitura" id="chuva-leitura">&nbsp;</p>
+    </div>
+  </div>
+</div>
 
-<div class="viz-root">
-<p>O mapa abaixo classifica Curitiba em células de 200 metros pela <strong>suscetibilidade a alagamento</strong>: o cruzamento entre quanta superfície impermeável existe na célula — estimada por uma rede neural sobre imagens Sentinel-2 — e quão plano é o terreno ali. Superfície selada define quanta chuva vira escoamento em vez de infiltrar; declividade define se essa água fica ou desce.</p>
-<p>A suscetibilidade é propriedade do <strong>território</strong>, não da previsão do tempo: ela não muda quando chove. O painel de chuva mostra o cenário previsto ao lado, para leitura conjunta. A <a href="./metodologia.html">metodologia</a> explica por que os dois não são multiplicados um pelo outro.</p>
-<section id="chuva-prevista" class="level2">
-<h2 class="anchored" data-anchor-id="chuva-prevista">Chuva prevista</h2>
-<div id="painel-chuva" class="painel-chuva" aria-live="polite">
-<div>
-<span class="rotulo">Cenário</span><span id="cenario" class="cenario">carregando…</span>
+<div class="dash-rodape">
+  <span>Não é sistema de alerta. Em emergência: Defesa Civil 199.</span>
+  <span id="creditos"></span>
+  <a href="metodologia.html">Metodologia</a>
 </div>
-<div>
-<span class="rotulo">Pico horário</span><span id="pico-hora" class="detalhe">—</span>
-</div>
-<div>
-<span class="rotulo">Pico em 24 h</span><span id="pico-dia" class="detalhe">—</span>
-</div>
-<div>
-<span class="rotulo">Critério</span><span id="criterio" class="detalhe">—</span>
-</div>
-</div>
-<p class="aviso" id="fonte-chuva">
-</p>
-</section>
-<section id="mapa" class="level2">
-<h2 class="anchored" data-anchor-id="mapa">Mapa</h2>
-<div id="mapa" role="img" aria-label="Mapa de suscetibilidade a alagamento em Curitiba, classificado em cinco faixas">
-
-</div>
-<ul class="legenda" id="legenda">
-</ul>
-<p class="aviso">
-Clique numa célula para ver a impermeabilidade estimada, a declividade média e o índice. As faixas são <strong>quintis</strong>: cada uma reúne 20% do território municipal, então a leitura é relativa a Curitiba — “esta célula está entre as 20% mais suscetíveis da cidade”.
-</p>
-</section>
-<section id="as-faixas-em-números" class="level2">
-<h2 class="anchored" data-anchor-id="as-faixas-em-números">As faixas em números</h2>
-<p>Mesma informação do mapa, em tabela — para quem lê com leitor de tela, para quem não distingue as cores e para conferir os números sem passar o mouse célula a célula.</p>
-<div id="tabela-classes">
 
 </div>
-</section>
-</div>
+
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
 <script type="module">
-// Lê a rampa dos custom properties do CSS: a paleta tem UMA definição, no
-// styles.css, e nada aqui repete hex.
-const raiz = document.querySelector('.viz-root');
-const cor = (n) => getComputedStyle(raiz).getPropertyValue(`--risk-${n}`).trim();
-const CORES = [1, 2, 3, 4, 5].map(cor);
+const raiz = document.getElementById('dash');
+const $ = (id) => document.getElementById(id);
+const token = (nome) => getComputedStyle(raiz).getPropertyValue(nome).trim();
+// A paleta tem UMA definição, no styles.css; nada aqui repete hex.
+const cores = () => [1, 2, 3, 4, 5].map((n) => token(`--risk-${n}`));
 
 const numero = (valor, casas = 1) =>
-  valor === undefined || valor === null
+  valor === undefined || valor === null || Number.isNaN(valor)
     ? '—'
-    : valor.toLocaleString('pt-BR', {
-        minimumFractionDigits: casas,
-        maximumFractionDigits: casas,
-      });
+    : valor.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });
 
 async function carregar(caminho) {
   const resposta = await fetch(caminho);
@@ -379,209 +391,412 @@ async function carregar(caminho) {
   return resposta.json();
 }
 
+function kpi(id, valor, nota, estado) {
+  const cartao = $(id);
+  cartao.querySelector('[data-v]').innerHTML = valor;
+  cartao.querySelector('[data-n]').textContent = nota ?? '';
+  if (estado) cartao.dataset.estado = estado; else delete cartao.dataset.estado;
+}
+
+// --------------------------------------------------------------------------
+// Dados
+// --------------------------------------------------------------------------
+
+const [metricas, grade] = await Promise.all([
+  carregar('data/metrics.json'),
+  carregar('data/susceptibility.geojson'),
+]);
+
+const rotulos = metricas.grid?.classes ?? ['muito baixa', 'baixa', 'média', 'alta', 'muito alta'];
+const TOPO = rotulos.length - 1;
+const bacias = metricas.grid?.basins ?? [];
+const bairros = metricas.grid?.neighbourhoods ?? [];
+// Bairro muito pequeno tem meia dúzia de células e a porcentagem dele oscila
+// por acaso; fica fora do ranking (mas continua clicável no mapa).
+const MIN_CELULAS_BAIRRO = 12;
+const TOP_BAIRROS = 10;
+// As propriedades viajam com nomes curtos; o mapeamento vem do metrics.json.
+const chave = metricas.grid?.properties ?? {
+  class_index: 'c', susceptibility: 's', impervious_mean: 'i', slope_mean_deg: 'd',
+  drainage_dist_m: 'r', basin_index: 'b', neighbourhood_index: 'n',
+};
+const lado = metricas.grid?.cell_size_m ?? 200;
+const AREA = (lado * lado) / 1e6;
+const celulas = grade.features.map((f) => f.properties);
+
+// Estado dos filtros: uma bacia (ou -1) e um conjunto de faixas (vazio = todas).
+const filtro = { bacia: -1, bairro: -1, faixas: new Set() };
+const naBacia = (p) => (filtro.bacia < 0 || p[chave.basin_index] === filtro.bacia)
+  && (filtro.bairro < 0 || p[chave.neighbourhood_index] === filtro.bairro);
+const visivel = (p) => naBacia(p) && (filtro.faixas.size === 0 || filtro.faixas.has(p[chave.class_index]));
+
 // --------------------------------------------------------------------------
 // Mapa
 // --------------------------------------------------------------------------
 
-// preferCanvas: são 11 mil polígonos. Em SVG, que é o padrão do Leaflet, o
-// navegador cria 11 mil nós no DOM e o mapa engasga ao arrastar.
-const mapa = L.map('mapa', { preferCanvas: true, scrollWheelZoom: false });
-mapa.setView([-25.4284, -49.2733], 11);
-
-const metricas = await carregar('data/metrics.json');
-
-// Duas bases. A de satélite é o PRÓPRIO mosaico que treinou a rede — mesma data,
-// mesma composição, mesma resolução —, então quem olha o mapa está vendo a
-// entrada do modelo, não uma imagem de outro ano e outro sensor. Isso também
-// dispensa provedor externo de imagem, que costuma exigir chave.
+// preferCanvas: são 11 mil polígonos; em SVG o navegador cria 11 mil nós no DOM.
+// zoomSnap fracionário: com passos inteiros, enquadrar uma bacia quase nunca
+// muda o zoom, porque o próximo nível inteiro já não cabe.
+const mapa = L.map('mapa', { preferCanvas: true, zoomSnap: 0.25, zoomDelta: 0.5 });
 const bases = {};
-
-const satelite = metricas.basemap;
-if (satelite) {
-  bases['Satélite (Sentinel-2)'] = L.imageOverlay(
-    `data/${satelite.file}`,
-    satelite.bounds,
-    {
-      attribution: `${satelite.source} — ${satelite.period}`,
-      // Fica abaixo das células, que são desenhadas no painel de overlay.
-      zIndex: 1,
-    },
-  );
-}
-
-bases['Mapa'] = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-  maxZoom: 19,
+bases['Ruas'] = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>', maxZoom: 19,
 });
+// Imagem aérea contínua, para contexto visual: cobre a tela inteira e aguenta
+// zoom de rua. NÃO é a imagem que o modelo viu — essa é a opção seguinte.
+bases['Satélite'] = L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Imagem: Esri, Maxar, Earthstar Geographics', maxZoom: 19,
+  });
+if (metricas.basemap) {
+  // O PRÓPRIO mosaico que alimentou a rede: mesma data e resolução (10 m).
+  bases['Sentinel-2 (entrada do modelo)'] = L.imageOverlay(`data/${metricas.basemap.file}`, metricas.basemap.bounds, {
+    attribution: `${metricas.basemap.source} — ${metricas.basemap.period}`, zIndex: 1,
+  });
+}
+bases['Ruas'].addTo(mapa);
 
-// Satélite primeiro quando existir: é o que dá contexto visual imediato de onde
-// está o tecido urbano que o índice mede.
-const baseInicial = bases['Satélite (Sentinel-2)'] ?? bases['Mapa'];
-baseInicial.addTo(mapa);
-const rotulos = metricas.grid?.classes ?? [
-  'muito baixa', 'baixa', 'média', 'alta', 'muito alta',
-];
-// As propriedades viajam com nomes curtos para o arquivo não inchar; o mapeamento
-// vem do metrics.json para que as letras não fiquem espalhadas por este código.
-const chave = metricas.grid?.properties ?? {
-  class_index: 'c', susceptibility: 's', impervious_mean: 'i', slope_mean_deg: 'd',
+const estilo = (feicao) => {
+  const p = feicao.properties;
+  const ativo = visivel(p);
+  return {
+    fillColor: cores()[p[chave.class_index]],
+    // Fora do filtro a célula não some: fica quase transparente, para manter
+    // a referência de onde a seleção está dentro da cidade.
+    fillOpacity: ativo ? 0.72 : 0.07,
+    weight: 0,
+  };
 };
 
-const grade = await carregar('data/susceptibility.geojson');
-
 const camada = L.geoJSON(grade, {
-  style: (feicao) => ({
-    fillColor: CORES[feicao.properties[chave.class_index]] ?? CORES[0],
-    // 0,7 é o meio-termo: sobre a imagem de satélite deixa a textura urbana
-    // aparecer por baixo, e sobre o mapa de ruas ainda lê como cor sólida.
-    fillOpacity: 0.7,
-    // Sem contorno: a 11 mil células, a borda some no zoom afastado e vira uma
-    // mancha escura que engorda a classe alta.
-    weight: 0,
-  }),
+  style: estilo,
   onEachFeature: (feicao, elemento) => {
     const p = feicao.properties;
-    const faixa = rotulos[p[chave.class_index]] ?? '—';
-    elemento.bindPopup(`
-      <strong>Suscetibilidade ${faixa}</strong>
+    elemento.bindPopup(() => `
+      <strong>Suscetibilidade ${rotulos[p[chave.class_index]] ?? '—'}</strong>
       <dl>
-        <dt>Impermeável</dt><dd>${numero(p[chave.impervious_mean] * 100)}%</dd>
-        <dt>Declividade</dt><dd>${numero(p[chave.slope_mean_deg], 2)}°</dd>
-        <dt>Índice</dt><dd>${numero(p[chave.susceptibility], 3)}</dd>
-      </dl>
-    `);
+        <dt>Impermeável</dt><dd>${numero(p[chave.impervious_mean] * 100, 0)}%</dd>
+        <dt>Declividade</dt><dd>${numero(p[chave.slope_mean_deg], 1)}°</dd>
+        <dt>Até a drenagem</dt><dd>${numero(p[chave.drainage_dist_m], 0)} m</dd>
+        ${bairros.length ? `<dt>Bairro</dt><dd>${bairros[p[chave.neighbourhood_index]] ?? '—'}</dd>` : ''}
+        <dt>Bacia</dt><dd>${bacias[p[chave.basin_index]] ?? '—'}</dd>
+        <dt>Índice</dt><dd>${numero(p[chave.susceptibility], 2)}</dd>
+      </dl>`);
   },
 }).addTo(mapa);
 
-mapa.fitBounds(camada.getBounds());
+const limiteCidade = camada.getBounds();
+mapa.fitBounds(limiteCidade);
+// O cartão do mapa muda de altura com a janela; o Leaflet precisa ser avisado.
+new ResizeObserver(() => mapa.invalidateSize()).observe($('mapa'));
+L.control.layers(bases, { 'Suscetibilidade': camada }, { position: 'topright' }).addTo(mapa);
 
-// O seletor entra depois da camada de células, para que ela apareça como
-// sobreposição que pode ser desligada — útil para olhar a imagem crua por baixo.
-L.control
-  .layers(bases, { 'Suscetibilidade': camada }, { collapsed: false })
-  .addTo(mapa);
-
-// Legenda: sempre presente, e o rótulo textual vai junto da marca — a classe
-// nunca é comunicada só por cor.
-document.getElementById('legenda').innerHTML = rotulos
-  .map((rotulo, i) => `<li><span class="marca" style="background:${CORES[i]}"></span>${rotulo}</li>`)
-  .join('');
-
-// --------------------------------------------------------------------------
-// Tabela — a leitura alternativa ao mapa
-// --------------------------------------------------------------------------
-
-const contagem = new Array(rotulos.length).fill(0);
-const somaImp = new Array(rotulos.length).fill(0);
-const somaDec = new Array(rotulos.length).fill(0);
-
-for (const f of grade.features) {
-  const i = f.properties[chave.class_index];
-  contagem[i] += 1;
-  somaImp[i] += f.properties[chave.impervious_mean] ?? 0;
-  somaDec[i] += f.properties[chave.slope_mean_deg] ?? 0;
+function enquadrar() {
+  if (filtro.bacia < 0 && filtro.bairro < 0) { mapa.fitBounds(limiteCidade); return; }
+  let limite = null;
+  camada.eachLayer((l) => {
+    if (!naBacia(l.feature.properties)) return;
+    limite = limite ? limite.extend(l.getBounds()) : L.latLngBounds(l.getBounds().getSouthWest(), l.getBounds().getNorthEast());
+  });
+  if (limite) mapa.fitBounds(limite, { padding: [12, 12] });
 }
 
-const lado = metricas.grid?.cell_size_m ?? 200;
-const areaCelula = (lado * lado) / 1e6;
-const total = grade.features.length;
+// --------------------------------------------------------------------------
+// Indicadores do território — recalculados a cada filtro
+// --------------------------------------------------------------------------
 
-document.getElementById('tabela-classes').innerHTML = `
-  <table class="table classes">
-    <thead>
-      <tr><th>Faixa</th><th>Células</th><th>Área</th><th>Impermeável</th><th>Declividade</th></tr>
-    </thead>
-    <tbody>
-      ${rotulos.map((rotulo, i) => `
-        <tr>
-          <td><span class="marca" style="background:${CORES[i]};display:inline-block;vertical-align:middle;margin-right:.4rem"></span>${rotulo}</td>
-          <td>${contagem[i].toLocaleString('pt-BR')}</td>
-          <td>${numero(contagem[i] * areaCelula)} km²</td>
-          <td>${numero((somaImp[i] / Math.max(contagem[i], 1)) * 100)}%</td>
-          <td>${numero(somaDec[i] / Math.max(contagem[i], 1), 2)}°</td>
+function resumoPor(nomes, campo) {
+  return nomes.map((nome, indice) => {
+    const dela = celulas.filter((p) => p[campo] === indice);
+    const topo = dela.filter((p) => p[chave.class_index] === TOPO).length;
+    return { nome, indice, celulas: dela.length, fracao: dela.length ? topo / dela.length : 0 };
+  }).sort((a, b) => b.fracao - a.fracao);
+}
+const ranking = resumoPor(bacias, chave.basin_index);
+const rankingBairros = resumoPor(bairros, chave.neighbourhood_index)
+  .filter((b) => b.celulas >= MIN_CELULAS_BAIRRO);
+
+function barras(alvo, linhas) {
+  $(alvo).innerHTML = linhas.map((l) => `
+    <button type="button" class="barra${l.ativa ? ' ativa' : ''}" data-chave="${l.chave}" aria-pressed="${l.ativa}">
+      <span class="barra-nome">${l.marca ? `<i style="background:${l.marca}"></i>` : ''}${l.nome}</span>
+      <span class="barra-trilho"><span style="width:${Math.max(l.fracao * 100, 0.5)}%;${l.marca ? `background:${l.marca}` : ''}"></span></span>
+      <span class="barra-valor">${l.valor}${l.extra ? `<small>${l.extra}</small>` : ''}</span>
+    </button>`).join('');
+}
+
+function atualizar() {
+  const selecao = celulas.filter(naBacia);
+  const total = selecao.length;
+  const paleta = cores();
+
+  const porFaixa = rotulos.map((_, i) => selecao.filter((p) => p[chave.class_index] === i));
+  const media = (lista, campo) => (lista.length ? lista.reduce((s, p) => s + (p[campo] ?? 0), 0) / lista.length : NaN);
+
+  const imp = numero(100 * media(selecao, chave.impervious_mean), 0);
+  kpi('kpi-imp', `${imp}<small>%</small>`, `${imp}% da área analisada é superfície impermeável`);
+
+  kpi('kpi-area', `${numero(total * AREA, 0)}<small> km²</small>`,
+    `${total.toLocaleString('pt-BR')} células de ${lado} m`);
+  const filtrado = filtro.bacia >= 0 || filtro.bairro >= 0;
+
+  const mediana = (lista, campo) => {
+    if (!lista.length) return NaN;
+    const v = lista.map((p) => p[campo] ?? 0).sort((x, y) => x - y);
+    return v[Math.floor(v.length / 2)];
+  };
+  $('faixas').innerHTML = `
+    <table class="faixas">
+      <thead><tr><th>Faixa</th>${filtrado ? '<th>Área</th>' : ''}<th>Imperm.</th><th>Decliv.</th><th>Até a drenagem</th></tr></thead>
+      <tbody>${rotulos.map((nome, i) => ({ nome, i })).reverse().map(({ nome, i }) => `
+        <tr class="${filtro.faixas.has(i) ? 'ativa' : ''}" data-chave="${i}" tabindex="0" role="checkbox" aria-checked="${filtro.faixas.has(i)}">
+          <td><span class="caixa">${filtro.faixas.has(i) ? '✓' : ''}</span><i style="background:${paleta[i]}"></i>${nome}</td>
+          ${filtrado ? `<td>${numero(porFaixa[i].length * AREA, 1)} km²</td>` : ''}
+          <td>${numero(100 * media(porFaixa[i], chave.impervious_mean), 0)}%</td>
+          <td>${numero(media(porFaixa[i], chave.slope_mean_deg), 1)}°</td>
+          <td>${numero(mediana(porFaixa[i], chave.drainage_dist_m), 0)} m</td>
         </tr>`).join('')}
-    </tbody>
-    <tfoot>
-      <tr><td>Total</td><td>${total.toLocaleString('pt-BR')}</td>
-      <td>${numero(total * areaCelula)} km²</td><td></td><td></td></tr>
-    </tfoot>
-  </table>`;
+      </tbody>
+    </table>`;
+
+  const teto = Math.max(...ranking.map((b) => b.fracao), 0.01);
+  barras('bacias', ranking.map((b) => ({
+    chave: b.indice, nome: b.nome, ativa: filtro.bacia === b.indice,
+    fracao: b.fracao / teto, valor: `${numero(100 * b.fracao, 0)}%`, extra: `${numero(b.celulas * AREA, 0)} km²`,
+  })));
+
+  if (rankingBairros.length) {
+    $('cartao-bairros').hidden = false;
+    const lista = rankingBairros.slice(0, TOP_BAIRROS);
+    // Bairro escolhido no mapa mas fora dos dez primeiros entra no fim da lista.
+    const escolhido = rankingBairros.find((b) => b.indice === filtro.bairro);
+    if (escolhido && !lista.includes(escolhido)) lista.push(escolhido);
+    const tetoBairro = Math.max(...lista.map((b) => b.fracao), 0.01);
+    barras('bairros', lista.map((b) => ({
+      chave: b.indice, nome: `${rankingBairros.indexOf(b) + 1}. ${b.nome}`, ativa: filtro.bairro === b.indice,
+      fracao: b.fracao / tetoBairro, valor: `${numero(100 * b.fracao, 0)}%`,
+    })));
+  }
+
+  $('escopo').textContent = [
+    filtro.bacia < 0 && filtro.bairro < 0 ? 'Município inteiro' : null,
+    filtro.bairro < 0 ? null : `Bairro ${bairros[filtro.bairro]}`,
+    filtro.bacia < 0 ? null : `Bacia do ${bacias[filtro.bacia]}`,
+    filtro.faixas.size === 0 ? null : `faixas: ${[...filtro.faixas].sort((a, b) => b - a).map((i) => rotulos[i]).join(', ')}`,
+  ].filter(Boolean).join(' · ');
+  $('filtro-bacia').value = String(filtro.bacia);
+  $('limpar').hidden = !filtrado && filtro.faixas.size === 0;
+  camada.setStyle(estilo);
+}
+
+$('filtro-bacia').innerHTML += ranking
+  .slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  .map((b) => `<option value="${b.indice}">${b.nome}</option>`).join('');
+$('filtro-bacia').addEventListener('change', (e) => {
+  filtro.bacia = Number(e.target.value); atualizar(); enquadrar();
+});
+$('bacias').addEventListener('click', (e) => {
+  const alvo = e.target.closest('.barra'); if (!alvo) return;
+  const indice = Number(alvo.dataset.chave);
+  filtro.bacia = filtro.bacia === indice ? -1 : indice; atualizar(); enquadrar();
+});
+$('bairros').addEventListener('click', (e) => {
+  const alvo = e.target.closest('.barra'); if (!alvo) return;
+  const indice = Number(alvo.dataset.chave);
+  filtro.bairro = filtro.bairro === indice ? -1 : indice; atualizar(); enquadrar();
+});
+$('faixas').addEventListener('click', (e) => {
+  const alvo = e.target.closest('tr[data-chave]'); if (!alvo) return;
+  const indice = Number(alvo.dataset.chave);
+  if (filtro.faixas.has(indice)) filtro.faixas.delete(indice); else filtro.faixas.add(indice);
+  // Marcar todas é o mesmo que não filtrar.
+  if (filtro.faixas.size === rotulos.length) filtro.faixas.clear();
+  atualizar();
+});
+$('faixas').addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const alvo = e.target.closest('tr[data-chave]'); if (!alvo) return;
+  e.preventDefault(); alvo.click();
+});
+$('limpar').addEventListener('click', () => {
+  filtro.bacia = -1; filtro.bairro = -1; filtro.faixas.clear(); atualizar(); enquadrar();
+});
+
+atualizar();
+
+const modelo = metricas.model;
+kpi('kpi-modelo', modelo ? `${numero(100 * modelo.test_dice, 0)}<small>%</small>` : '—',
+  modelo ? `Dice no teste · IoU ${numero(100 * modelo.test_iou, 0)}%` : 'sem avaliação');
+$('creditos').textContent = Object.values(metricas.attribution ?? {}).join(' · ');
+// O tema pode trocar depois do carregamento; as cores do mapa acompanham.
+new MutationObserver(atualizar).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
 // --------------------------------------------------------------------------
-// Chuva — ao vivo quando possível, snapshot quando não
+// Chuva — o que choveu e o que está previsto
 // --------------------------------------------------------------------------
 
 const patamares = metricas.scenarios?.tiers ?? [];
+const DIAS_PASSADOS = 7;
+const HORAS_PREVISAO = 48;
 
 // Mesmo "ou" dos critérios do INMET: vale o patamar mais alto atingido por
-// qualquer um dos dois.
-function classificar(picoHora, picoDia) {
-  let escolhido = patamares[0];
+// qualquer um dos dois (intensidade horária ou acumulado em 24 h).
+function patamar(picoHora, picoDia) {
+  let escolhido = patamares[0] ?? {};
   for (const t of patamares) {
     if (picoHora >= t.hourly_mm || picoDia >= t.daily_mm) escolhido = t;
   }
   return escolhido;
 }
 
-function maiorAcumulado(valores, janela) {
-  if (!valores.length) return 0;
-  if (janela >= valores.length) return valores.reduce((a, b) => a + b, 0);
-  let atual = valores.slice(0, janela).reduce((a, b) => a + b, 0);
-  let melhor = atual;
-  for (let i = janela; i < valores.length; i += 1) {
-    atual += valores[i] - valores[i - janela];
-    melhor = Math.max(melhor, atual);
+// Maior acumulado em janela deslizante, e a posição onde a janela termina.
+function maiorJanela(valores, janela) {
+  let atual = 0, melhor = 0, fim = -1;
+  for (let i = 0; i < valores.length; i += 1) {
+    atual += valores[i];
+    if (i >= janela) atual -= valores[i - janela];
+    if (atual > melhor) { melhor = atual; fim = i; }
   }
-  return melhor;
+  return { valor: melhor, fim };
 }
 
-function mostrarChuva(picoHora, picoDia, origem) {
-  const patamar = classificar(picoHora, picoDia) ?? {};
-  const porIntensidade = (patamar.hourly_mm ?? 0) > 0 && picoHora >= patamar.hourly_mm;
-  document.getElementById('cenario').textContent = patamar.label ?? '—';
-  document.getElementById('pico-hora').textContent = `${numero(picoHora)} mm/h`;
-  document.getElementById('pico-dia').textContent = `${numero(picoDia)} mm`;
-  document.getElementById('criterio').textContent =
-    (patamar.daily_mm ?? 0) === 0
-      ? 'nenhum critério atingido'
-      : porIntensidade ? 'intensidade horária' : 'acumulado em 24 h';
-  document.getElementById('fonte-chuva').textContent =
-    `${origem} · patamares: ${metricas.scenarios?.source ?? ''} · ${metricas.attribution?.forecast ?? ''}`;
+function leitura(valores) {
+  const hora = maiorJanela(valores, 1);
+  const dia = maiorJanela(valores, 24);
+  return { hora, dia, patamar: patamar(hora.valor, dia.valor) };
 }
 
-const PONTO = { lat: -25.4284, lon: -49.2733 };
+function aviso(p) {
+  const texto = p.inmet_alert ?? 'sem aviso';
+  return texto === 'sem aviso' ? 'abaixo de aviso do INMET' : `aviso ${texto} do INMET`;
+}
+const estadoDe = (p) => (p.name === 'critica' ? 'critico' : p.name === 'forte' ? 'atencao' : null);
+const quando = (iso) => new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+const MARGEM = { topo: 8, dir: 6, base: 22, esq: 32 };
+
+function grafico(tempos, valores, agora) {
+  const alvo = $('chuva-grafico');
+  // Desenhado em pixels reais do cartão: o texto do eixo sai no tamanho da
+  // página, em vez de encolher junto com um viewBox fixo.
+  const desenhar = () => {
+    const L_ = Math.max(alvo.clientWidth, 240);
+    const A = Math.max(alvo.clientHeight, 150);
+    const m = MARGEM;
+    const largura = L_ - m.esq - m.dir, altura = A - m.topo - m.base;
+    const pico = Math.max(...valores, 0);
+    const teto = [2, 5, 10, 20, 40, 60, 100].find((t) => t >= pico) ?? Math.ceil(pico / 50) * 50;
+    const passo = largura / valores.length;
+    const y = (v) => m.topo + altura - (v / teto) * altura;
+
+    const grades = [0, teto / 2, teto].map((v) => `
+      <line class="grade" x1="${m.esq}" x2="${L_ - m.dir}" y1="${y(v)}" y2="${y(v)}"></line>
+      <text x="${m.esq - 5}" y="${y(v) + 3.5}" text-anchor="end">${numero(v, teto < 5 ? 1 : 0)}</text>`).join('');
+    const dias = tempos.map((t, i) => (t.endsWith('T00:00') ? i : -1)).filter((i) => i >= 0);
+    const pular = Math.ceil(dias.length / Math.max(Math.floor(largura / 44), 1));
+    const eixo = dias.filter((_, k) => k % pular === 0).map((i) => `
+      <line class="grade" x1="${m.esq + i * passo}" x2="${m.esq + i * passo}" y1="${m.topo + altura}" y2="${m.topo + altura + 4}"></line>
+      <text x="${m.esq + i * passo + 2}" y="${A - 6}">${tempos[i].slice(8, 10)}/${tempos[i].slice(5, 7)}</text>`).join('');
+    const barrasSvg = valores.map((v, i) => `<rect class="${i >= agora ? 'futuro' : 'passado'}" data-i="${i}"
+      x="${(m.esq + i * passo).toFixed(1)}" y="${y(v).toFixed(1)}" width="${Math.max(passo - 0.4, 0.8).toFixed(1)}"
+      height="${(m.topo + altura - y(v)).toFixed(1)}"></rect>`).join('');
+    const x = m.esq + agora * passo;
+    alvo.innerHTML = `
+      <svg width="${L_}" height="${A}" viewBox="0 0 ${L_} ${A}" role="img" aria-label="Chuva horária em milímetros: ${DIAS_PASSADOS} dias passados e ${HORAS_PREVISAO} horas previstas">
+        ${grades}${eixo}
+        ${agora > 0 && agora < valores.length ? `<rect class="faixa-previsao" x="${x}" y="${m.topo}" width="${L_ - m.dir - x}" height="${altura}"></rect>` : ''}
+        ${barrasSvg}
+        ${agora > 0 && agora < valores.length ? `<line class="agora" x1="${x}" x2="${x}" y1="${m.topo}" y2="${m.topo + altura}"></line>
+        <text class="rotulo-agora" x="${x - 4}" y="${m.topo + 9}" text-anchor="end">agora</text>` : ''}
+        <line class="cursor" visibility="hidden" y1="${m.topo}" y2="${m.topo + altura}"></line>
+      </svg>`;
+  };
+  desenhar();
+  new ResizeObserver(desenhar).observe(alvo);
+
+  $('chuva-leitura').textContent = 'mm por hora · área sombreada = previsão';
+
+  // A dica segue o cursor pela POSIÇÃO horizontal, não pela barra sob ele: as
+  // barras têm 1–2 px e hora sem chuva não tem barra nenhuma para acertar.
+  const dica = $('chuva-dica');
+  const esconder = () => { dica.hidden = true; alvo.querySelector('.cursor')?.setAttribute('visibility', 'hidden'); };
+  alvo.addEventListener('pointermove', (e) => {
+    const caixa = alvo.getBoundingClientRect();
+    const largura = caixa.width - MARGEM.esq - MARGEM.dir;
+    const i = Math.floor(((e.clientX - caixa.left - MARGEM.esq) / largura) * valores.length);
+    if (i < 0 || i >= valores.length) { esconder(); return; }
+    const x = MARGEM.esq + (i + 0.5) * (largura / valores.length);
+    const cursor = alvo.querySelector('.cursor');
+    cursor?.setAttribute('x1', x); cursor?.setAttribute('x2', x); cursor?.setAttribute('visibility', 'visible');
+    const dia = maiorJanela(valores.slice(Math.max(i - 23, 0), i + 1), 24).valor;
+    dica.innerHTML = `<strong>${numero(valores[i])} mm</strong> nesta hora
+      <span>${quando(tempos[i])} · ${i >= agora ? 'previsão' : 'registrado'}</span>
+      <span>${numero(dia)} mm nas 24 h até aqui</span>`;
+    dica.hidden = false;
+    // Vira para a esquerda perto da borda direita, para não sair do cartão.
+    const direita = x > caixa.width * 0.6;
+    dica.style.left = direita ? '' : `${x + 10}px`;
+    dica.style.right = direita ? `${caixa.width - x + 10}px` : '';
+  });
+  alvo.addEventListener('pointerleave', esconder);
+}
 
 try {
-  // A chamada ao vivo pode falhar por CORS, rede da sala ou API fora do ar. O
-  // snapshot existe exatamente para que a página nunca dependa disso.
-  const url = `https://api.open-meteo.com/v1/forecast?latitude=${PONTO.lat}&longitude=${PONTO.lon}&hourly=precipitation&forecast_days=2&timezone=America%2FSao_Paulo`;
-  const resposta = await fetch(url, { signal: AbortSignal.timeout(6000) });
+  // Uma chamada só traz os 7 dias anteriores e as 48 h seguintes. Pode falhar
+  // por rede ou API fora do ar; o snapshot do build existe para isso.
+  const url = 'https://api.open-meteo.com/v1/forecast?latitude=-25.4284&longitude=-49.2733'
+    + `&hourly=precipitation&past_days=${DIAS_PASSADOS}&forecast_days=3&timezone=America%2FSao_Paulo`;
+  const resposta = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!resposta.ok) throw new Error(`HTTP ${resposta.status}`);
   const dados = await resposta.json();
-  const chuva = dados.hourly?.precipitation ?? [];
+  const tempos = dados.hourly?.time ?? [];
+  const chuva = (dados.hourly?.precipitation ?? []).map((v) => v ?? 0);
   if (!chuva.length) throw new Error('série vazia');
-  mostrarChuva(maiorAcumulado(chuva, 1), maiorAcumulado(chuva, 24), 'Previsão ao vivo');
+
+  // A API devolve hora local de Curitiba sem fuso; compara-se texto com texto.
+  const local = new Intl.DateTimeFormat('sv-SE', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
+  }).format(new Date()).replace(' ', 'T');
+  let agora = tempos.findIndex((t) => t > local);
+  if (agora < 0) agora = tempos.length;
+  const fim = Math.min(agora + HORAS_PREVISAO, tempos.length);
+
+  const passado = leitura(chuva.slice(0, agora));
+  const futuro = leitura(chuva.slice(agora, fim));
+
+  kpi('kpi-previsao', `${numero(futuro.dia.valor)}<small> mm em 24 h</small>`,
+    `pico ${numero(futuro.hora.valor)} mm/h · ${aviso(futuro.patamar)}`, estadoDe(futuro.patamar));
+  kpi('kpi-recente', `${numero(passado.dia.valor)}<small> mm em 24 h</small>`,
+    passado.dia.fim < 0 ? 'sem chuva no período'
+      : `até ${quando(tempos[passado.dia.fim])} · pico ${numero(passado.hora.valor)} mm/h · ${aviso(passado.patamar)}`,
+    estadoDe(passado.patamar));
+  $('chuva-origem').textContent = 'Open-Meteo, ao vivo';
+  grafico(tempos.slice(0, fim), chuva.slice(0, fim), agora);
 } catch (erro) {
   console.warn('Open-Meteo ao vivo indisponível, usando o snapshot:', erro);
   try {
-    const snapshot = await carregar('data/forecast.json');
-    mostrarChuva(
-      snapshot.peak_hourly_mm ?? 0,
-      snapshot.peak_daily_mm ?? 0,
-      `Snapshot de ${new Date(snapshot.generated_at).toLocaleString('pt-BR')}`,
-    );
+    const s = await carregar('data/forecast.json');
+    const p = patamar(s.peak_hourly_mm ?? 0, s.peak_daily_mm ?? 0);
+    kpi('kpi-previsao', `${numero(s.peak_daily_mm ?? 0)}<small> mm em 24 h</small>`,
+      `pico ${numero(s.peak_hourly_mm ?? 0)} mm/h · ${aviso(p)}`, estadoDe(p));
+    kpi('kpi-recente', '—', 'disponível só com a consulta ao vivo');
+    $('chuva-origem').textContent = `cópia de ${quando(s.generated_at)}`;
+    const tempos = s.hourly?.time ?? [];
+    const chuva = s.hourly?.precipitation_mm ?? s.hourly?.precipitation ?? [];
+    if (tempos.length && chuva.length) grafico(tempos, chuva, 0);
+    else $('chuva-grafico').textContent = 'Série horária indisponível.';
   } catch (falha) {
-    document.getElementById('cenario').textContent = 'indisponível';
-    document.getElementById('fonte-chuva').textContent =
-      'Não foi possível obter a previsão nem o snapshot.';
     console.error(falha);
+    kpi('kpi-previsao', '—', 'previsão indisponível');
+    kpi('kpi-recente', '—', 'indisponível');
+    $('chuva-grafico').textContent = 'Não foi possível obter a chuva.';
   }
 }
 </script>
 
 
 
-</main> <!-- /main -->
+
 <script id="quarto-html-after-body" type="application/javascript">
   window.document.addEventListener("DOMContentLoaded", function (event) {
     // Ensure there is a toggle, if there isn't float one in the top right

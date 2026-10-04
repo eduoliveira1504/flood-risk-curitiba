@@ -39,6 +39,9 @@ __all__ = [
     "ReportError",
     "build",
     "compact_geojson",
+    "index_basins",
+    "index_names",
+    "index_neighbourhoods",
     "round_coordinates",
 ]
 
@@ -55,6 +58,9 @@ WEB_PROPERTIES = {
     "susceptibility": "s",
     "impervious_mean": "i",
     "slope_mean_deg": "d",
+    "drainage_dist_m": "r",
+    "basin_index": "b",
+    "neighbourhood_index": "n",
 }
 
 #: Casas decimais em grau. 5 casas ≈ 1,1 m — precisão de sobra para células de
@@ -68,6 +74,7 @@ PROPERTY_DECIMALS = {
     "susceptibility": 3,
     "impervious_mean": 3,
     "slope_mean_deg": 2,
+    "drainage_dist_m": 0,
 }
 
 #: Acima disto o estágio avisa. O limite considera que o GitHub Pages serve com
@@ -248,6 +255,7 @@ def _collect_metrics(config: Config) -> dict:
         "worldcover": "ESA WorldCover 2021 v200",
         "dem": "Copernicus DEM GLO-30",
         "streets": "GeoCuritiba / IPPUC — Prefeitura de Curitiba",
+        "drainage": "GeoCuritiba / IPPUC — Trecho de Drenagem",
         "boundary": "Malhas municipais IBGE",
     }
     return metrics
@@ -257,6 +265,39 @@ def _class_labels():
     from .features.susceptibility import CLASS_LABELS
 
     return CLASS_LABELS
+
+
+def index_names(data, source: str, target: str) -> list[str]:
+    """Troca um nome repetido em cada célula por um índice, e devolve os nomes.
+
+    O nome viaja uma vez só, no ``metrics.json``. Repetir "Ribeirão dos Padilha"
+    em 11 mil células custaria centenas de kB para dizer seis palavras
+    diferentes. Célula sem nome recebe -1.
+    """
+    features = data.get("features") or []
+    names = sorted(
+        {
+            (feature.get("properties") or {}).get(source)
+            for feature in features
+            if (feature.get("properties") or {}).get(source)
+        }
+    )
+    position = {name: index for index, name in enumerate(names)}
+    for feature in features:
+        properties = feature.get("properties")
+        if isinstance(properties, dict):
+            properties[target] = position.get(properties.get(source), -1)
+    return names
+
+
+def index_basins(data) -> list[str]:
+    """Bacia hidrográfica de cada célula, como índice."""
+    return index_names(data, "basin", "basin_index")
+
+
+def index_neighbourhoods(data) -> list[str]:
+    """Bairro de cada célula, como índice."""
+    return index_names(data, "neighbourhood", "neighbourhood_index")
 
 
 def build(config: Config) -> Path:
@@ -271,7 +312,10 @@ def build(config: Config) -> Path:
             "Rode 'susceptibility' antes."
         )
     original = source.stat().st_size
-    compacted = compact_geojson(_read_json(source, "camada de suscetibilidade"))
+    layer = _read_json(source, "camada de suscetibilidade")
+    basin_names = index_basins(layer)
+    neighbourhood_names = index_neighbourhoods(layer)
+    compacted = compact_geojson(layer)
     written = _write_json(destination / "susceptibility.geojson", compacted)
     logger.info(
         "suscetibilidade: %.1f MB → %.1f MB (%.0f%% menor), %d células",
@@ -314,6 +358,10 @@ def build(config: Config) -> Path:
     metrics = _collect_metrics(config)
     if metrics_basemap:
         metrics["basemap"] = metrics_basemap
+    if basin_names:
+        metrics.setdefault("grid", {})["basins"] = basin_names
+    if neighbourhood_names:
+        metrics.setdefault("grid", {})["neighbourhoods"] = neighbourhood_names
     _write_json(destination / "metrics.json", metrics, compact=False)
     logger.info("métricas escritas em %s", config.display_path(destination / "metrics.json"))
 

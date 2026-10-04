@@ -9,6 +9,7 @@ from floodrisk.report import (
     WEB_PROPERTIES,
     ReportError,
     compact_geojson,
+    index_basins,
     round_coordinates,
 )
 
@@ -22,6 +23,9 @@ def cell(x=-49.2733123456789, y=-25.4284987654321, **properties):
         "susceptibility": 0.812345678,
         "impervious_mean": 0.9551234,
         "slope_mean_deg": 2.4123456,
+        "drainage_dist_m": 137.26,
+        "basin_index": 2,
+        "neighbourhood_index": 5,
         "flatness": 0.77123,
         "pixels": 400,
     }
@@ -156,3 +160,25 @@ def test_a_collection_where_nothing_survives_is_rejected():
     broken = {"type": "Feature", "properties": {}, "geometry": None}
     with pytest.raises(ReportError, match="nenhuma feição"):
         compact_geojson(collection(broken))
+
+
+# --------------------------------------------------------------------------- #
+# Bacias
+# --------------------------------------------------------------------------- #
+
+
+def test_basin_names_become_indices():
+    data = collection(cell(basin="Rio Belém"), cell(basin="Rio Atuba"), cell(basin="Rio Belém"))
+    names = index_basins(data)
+    assert names == ["Rio Atuba", "Rio Belém"]
+    assert [f["properties"]["basin_index"] for f in data["features"]] == [1, 0, 1]
+
+
+def test_a_cell_outside_every_basin_gets_minus_one():
+    data = collection(cell(basin=None), cell(basin="Rio Belém"))
+    index_basins(data)
+    assert data["features"][0]["properties"]["basin_index"] == -1
+
+
+def test_a_layer_without_basins_yields_no_names():
+    assert index_basins(collection(cell())) == []

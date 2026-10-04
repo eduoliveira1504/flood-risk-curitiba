@@ -7,16 +7,30 @@ subtitle: "Como o mapa foi construído, e o que ele não diz"
 
 ## O que o mapa mede
 
-Alagamento urbano acontece onde muita água é gerada e pouca gravidade a leva
-embora. Superfície impermeável — asfalto, telhado, calçada — determina quanta
-chuva vira escoamento em vez de infiltrar no solo. Declividade determina se essa
-água permanece ou desce. Uma área impermeável numa ladeira não alaga ali:
-transfere o problema para baixo. Uma área permeável e plana absorve.
+Alagamento urbano acontece onde muita água é gerada e o terreno a retém.
+Superfície impermeável — asfalto, telhado, calçada — determina quanta chuva vira
+escoamento em vez de infiltrar no solo. O terreno determina se essa água fica, e
+tem duas leituras: a **declividade** diz se a água tem gravidade para sair dali,
+e a **proximidade de um curso d'água** diz se o entorno despeja água ali, porque
+a rede de rios marca as linhas para onde o relevo converge. Um topo de divisor
+plano e um fundo de vale plano têm a mesma declividade; só o segundo recebe a
+água dos outros.
 
-O índice é o **produto** dos dois fatores, não a soma. Numa soma, uma célula
-íngreme e totalmente selada empataria com uma plana e semipermeável, que são
-situações fisicamente distintas. No produto, um fator próximo de zero zera o
-resultado, que é o comportamento correto.
+O índice é o **produto** da impermeabilidade pela retenção do terreno, e a
+retenção é a média geométrica entre planicidade e proximidade da drenagem:
+
+`índice = impermeabilidade × √(planicidade × proximidade)`
+
+Produto, e não soma, porque numa soma uma célula íngreme e totalmente selada
+empataria com uma plana e semipermeável, que são situações fisicamente
+distintas. Os dois fatores de terreno dividem um único lugar na fórmula porque
+medem o mesmo fenômeno — a água fica —, de modo que terreno e superfície pesam
+igual.
+
+O mapa trata de **alagamento** (água de chuva acumulada em área urbanizada), não
+de **inundação** fluvial (o rio fora da calha). Margem de rio ocupada por parque
+aparece em faixa baixa: é permeável, e portanto não gera o escoamento que o
+índice mede.
 
 <div id="composicao"></div>
 
@@ -28,6 +42,7 @@ resultado, que é o comportamento correto.
 | Superfície construída | ESA WorldCover 2021 v200 | Rótulo de treino |
 | Malha viária | GeoCuritiba / IPPUC | Complementa o rótulo nas vias |
 | Elevação | Copernicus DEM GLO-30 | Origem da declividade |
+| Cursos d'água | GeoCuritiba / IPPUC, Trecho de Drenagem | Proximidade da drenagem |
 | Limite municipal | Malhas municipais do IBGE | Recorte do produto |
 | Chuva | Open-Meteo (CC-BY 4.0) | Cenário exibido ao lado do mapa |
 

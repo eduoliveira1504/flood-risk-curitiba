@@ -12,12 +12,12 @@ website:
   title: "Suscetibilidade a alagamento — Curitiba"
   description: >
     Mapa de suscetibilidade a alagamento urbano em Curitiba, construído a partir
-    de segmentação de superfície impermeável por rede neural e declividade do
-    terreno.
+    de segmentação de superfície impermeável por rede neural, declividade do
+    terreno e proximidade da rede de drenagem.
   navbar:
     left:
       - href: index.qmd
-        text: Mapa
+        text: Painel
       - href: metodologia.qmd
         text: Metodologia
     right:

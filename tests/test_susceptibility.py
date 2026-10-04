@@ -12,6 +12,7 @@ from floodrisk.features.susceptibility import (
     SusceptibilityError,
     classify,
     percentile_rank,
+    retention_factor,
     susceptibility_index,
 )
 
@@ -103,52 +104,94 @@ def test_a_two_dimensional_input_is_rejected():
 # Índice
 # --------------------------------------------------------------------------- #
 
+NEAR = 50.0  # metros até o curso d'água
+
 
 def test_flat_and_sealed_beats_steep_and_sealed():
     """A regra física do projeto: impermeável em ladeira transfere, não acumula."""
-    index = susceptibility_index([0.9, 0.9], [1.0, 30.0])
+    index = susceptibility_index([0.9, 0.9], [1.0, 30.0], [NEAR, NEAR])
     assert index[0] > index[1]
 
 
-def test_sealed_beats_permeable_at_the_same_slope():
-    index = susceptibility_index([0.9, 0.1, 0.5], [5.0, 5.0, 5.0])
+def test_sealed_beats_permeable_at_the_same_terrain():
+    index = susceptibility_index([0.9, 0.1, 0.5], [5.0] * 3, [NEAR] * 3)
     assert index[0] > index[2] > index[1]
 
 
-def test_a_permeable_cell_scores_near_zero_however_flat():
-    index = susceptibility_index([0.0, 0.8], [0.1, 20.0])
+def test_near_the_drainage_beats_far_from_it():
+    """Mesma superfície, mesma declividade: quem está no fundo de vale recebe a
+    água do entorno, quem está no divisor a manda embora."""
+    index = susceptibility_index([0.9] * 3, [3.0] * 3, [30.0, 300.0, 900.0])
+    assert index[0] > index[1] > index[2]
+
+
+def test_a_permeable_cell_scores_near_zero_however_flat_and_close():
+    """É o que separa alagamento de inundação: parque na beira do rio não gera
+    escoamento, e o índice não o promove por estar perto da água."""
+    index = susceptibility_index([0.0, 0.8], [0.1, 20.0], [5.0, 800.0])
     assert index[0] == pytest.approx(0.0)
 
 
 def test_the_index_is_a_product_not_a_sum():
     """Numa soma, íngreme-e-impermeável empataria com plano-e-semipermeável —
     situações fisicamente distintas. No produto, um fator baixo domina."""
-    impervious = [1.0, 0.5, 0.5, 0.0]
+    impervious = [1.0, 0.7, 0.7, 0.0]
     slope = [30.0, 10.0, 10.0, 1.0]
-    index = susceptibility_index(impervious, slope)
-    steep_sealed = index[0]
-    assert steep_sealed < max(index)
+    index = susceptibility_index(impervious, slope, [NEAR] * 4)
+    assert index[0] < max(index)
 
 
 def test_the_index_stays_inside_the_unit_interval():
     rng = np.random.default_rng(1)
-    index = susceptibility_index(rng.random(500), rng.gamma(2, 3, 500))
+    index = susceptibility_index(
+        rng.random(500), rng.gamma(2, 3, 500), rng.gamma(2, 100, 500)
+    )
     assert index.min() >= 0 and index.max() <= 1
+
+
+def test_retention_is_the_geometric_mean_of_its_two_factors():
+    slope = np.array([1.0, 4.0, 9.0, 20.0])
+    distance = np.array([400.0, 30.0, 150.0, 80.0])
+    flatness = 1.0 - percentile_rank(slope)
+    proximity = 1.0 - percentile_rank(distance)
+    assert np.allclose(retention_factor(slope, distance), np.sqrt(flatness * proximity))
+
+
+def test_terrain_and_surface_weigh_the_same():
+    """A raiz existe para isto: com os dois fatores de terreno iguais a t, a
+    retenção vale t — e não t², que daria ao terreno o dobro do peso."""
+    values = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
+    retention = retention_factor(values, values)
+    assert np.allclose(retention, 1.0 - percentile_rank(values))
+
+
+def test_flat_but_far_does_not_get_high_retention():
+    """Média geométrica, não aritmética: um fator de terreno não compensa o outro."""
+    slope = np.array([0.5, 0.5, 15.0, 15.0])
+    distance = np.array([20.0, 900.0, 20.0, 900.0])
+    retention = retention_factor(slope, distance)
+    assert retention[0] > retention[1] and retention[0] > retention[2]
+    assert retention[3] == retention.min()
 
 
 def test_mismatched_shapes_are_rejected():
     with pytest.raises(SusceptibilityError, match="formas diferentes"):
-        susceptibility_index([0.5, 0.5], [1.0])
+        susceptibility_index([0.5, 0.5], [1.0], [NEAR, NEAR])
 
 
 def test_a_probability_outside_the_unit_interval_is_rejected():
     with pytest.raises(SusceptibilityError, match=r"\[0, 1\]"):
-        susceptibility_index([1.5], [1.0])
+        susceptibility_index([1.5], [1.0], [NEAR])
+
+
+def test_a_negative_distance_is_rejected():
+    with pytest.raises(SusceptibilityError, match="negativa"):
+        susceptibility_index([0.5], [1.0], [-1.0])
 
 
 def test_no_cells_is_rejected():
     with pytest.raises(SusceptibilityError, match="nenhuma célula"):
-        susceptibility_index([], [])
+        susceptibility_index([], [], [])
 
 
 # --------------------------------------------------------------------------- #
@@ -227,33 +270,33 @@ def test_a_coverage_fraction_outside_the_range_is_rejected():
 
 
 # --------------------------------------------------------------------------- #
-# Contribuição do segundo eixo
+# Contribuição dos fatores de terreno
 # --------------------------------------------------------------------------- #
 
 
-def test_slope_actually_moves_cells_between_classes():
-    """Se a declividade não reclassificasse nada, o DEM seria trabalho decorativo
-    e o índice deveria ser simplificado para impermeabilidade pura."""
+def test_terrain_actually_moves_cells_between_classes():
+    """Se o terreno não reclassificasse nada, DEM e hidrografia seriam trabalho
+    decorativo e o índice deveria ser simplificado para impermeabilidade pura."""
     rng = np.random.default_rng(5)
     impervious = rng.random(2000)
     slope = rng.gamma(2, 3, 2000)
+    distance = rng.gamma(2, 100, 2000)
 
-    combined = classify(susceptibility_index(impervious, slope))
-    impervious_only = classify(impervious)
-    assert (combined != impervious_only).mean() > 0.1
+    combined = classify(susceptibility_index(impervious, slope, distance))
+    assert (combined != classify(impervious)).mean() > 0.1
 
 
-def test_with_uniform_slope_the_two_maps_agree():
-    """Terreno sem variação não pode reordenar nada — se reordenasse, o fator de
-    planicidade estaria inventando diferença onde não há."""
+def test_with_uniform_terrain_the_map_is_the_impervious_map():
+    """Terreno sem variação não pode reordenar nada — se reordenasse, os fatores
+    estariam inventando diferença onde não há."""
     impervious = np.linspace(0.01, 0.99, 500)
-    slope = np.full(500, 4.2)
-
-    combined = classify(susceptibility_index(impervious, slope))
+    combined = classify(
+        susceptibility_index(impervious, np.full(500, 4.2), np.full(500, 120.0))
+    )
     assert np.array_equal(combined, classify(impervious))
 
 
 def test_a_flat_cell_never_ranks_below_a_steeper_twin():
-    """Mesma impermeabilidade, declividades diferentes: a plana vem na frente."""
-    index = susceptibility_index([0.6, 0.6, 0.6], [1.0, 8.0, 25.0])
+    """Mesma impermeabilidade e distância, declividades diferentes."""
+    index = susceptibility_index([0.6] * 3, [1.0, 8.0, 25.0], [NEAR] * 3)
     assert index[0] > index[1] > index[2]

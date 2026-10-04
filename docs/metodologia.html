@@ -263,7 +263,7 @@ ul.task-list li input[type="checkbox"] {
             <ul class="navbar-nav navbar-nav-scroll me-auto">
   <li class="nav-item">
     <a class="nav-link" href="./index.html"> 
-<span class="menu-text">Mapa</span></a>
+<span class="menu-text">Painel</span></a>
   </li>  
   <li class="nav-item">
     <a class="nav-link active" href="./metodologia.html" aria-current="page"> 
@@ -318,8 +318,11 @@ ul.task-list li input[type="checkbox"] {
 <div class="viz-root">
 <section id="o-que-o-mapa-mede" class="level2">
 <h2 class="anchored" data-anchor-id="o-que-o-mapa-mede">O que o mapa mede</h2>
-<p>Alagamento urbano acontece onde muita água é gerada e pouca gravidade a leva embora. Superfície impermeável — asfalto, telhado, calçada — determina quanta chuva vira escoamento em vez de infiltrar no solo. Declividade determina se essa água permanece ou desce. Uma área impermeável numa ladeira não alaga ali: transfere o problema para baixo. Uma área permeável e plana absorve.</p>
-<p>O índice é o <strong>produto</strong> dos dois fatores, não a soma. Numa soma, uma célula íngreme e totalmente selada empataria com uma plana e semipermeável, que são situações fisicamente distintas. No produto, um fator próximo de zero zera o resultado, que é o comportamento correto.</p>
+<p>Alagamento urbano acontece onde muita água é gerada e o terreno a retém. Superfície impermeável — asfalto, telhado, calçada — determina quanta chuva vira escoamento em vez de infiltrar no solo. O terreno determina se essa água fica, e tem duas leituras: a <strong>declividade</strong> diz se a água tem gravidade para sair dali, e a <strong>proximidade de um curso d’água</strong> diz se o entorno despeja água ali, porque a rede de rios marca as linhas para onde o relevo converge. Um topo de divisor plano e um fundo de vale plano têm a mesma declividade; só o segundo recebe a água dos outros.</p>
+<p>O índice é o <strong>produto</strong> da impermeabilidade pela retenção do terreno, e a retenção é a média geométrica entre planicidade e proximidade da drenagem:</p>
+<p><code>índice = impermeabilidade × √(planicidade × proximidade)</code></p>
+<p>Produto, e não soma, porque numa soma uma célula íngreme e totalmente selada empataria com uma plana e semipermeável, que são situações fisicamente distintas. Os dois fatores de terreno dividem um único lugar na fórmula porque medem o mesmo fenômeno — a água fica —, de modo que terreno e superfície pesam igual.</p>
+<p>O mapa trata de <strong>alagamento</strong> (água de chuva acumulada em área urbanizada), não de <strong>inundação</strong> fluvial (o rio fora da calha). Margem de rio ocupada por parque aparece em faixa baixa: é permeável, e portanto não gera o escoamento que o índice mede.</p>
 <div id="composicao">
 
 </div>
@@ -361,11 +364,16 @@ ul.task-list li input[type="checkbox"] {
 <td>Origem da declividade</td>
 </tr>
 <tr class="odd">
+<td>Cursos d’água</td>
+<td>GeoCuritiba / IPPUC, Trecho de Drenagem</td>
+<td>Proximidade da drenagem</td>
+</tr>
+<tr class="even">
 <td>Limite municipal</td>
 <td>Malhas municipais do IBGE</td>
 <td>Recorte do produto</td>
 </tr>
-<tr class="even">
+<tr class="odd">
 <td>Chuva</td>
 <td>Open-Meteo (CC-BY 4.0)</td>
 <td>Cenário exibido ao lado do mapa</td>

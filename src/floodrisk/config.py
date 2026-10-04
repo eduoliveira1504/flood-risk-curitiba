@@ -339,6 +339,93 @@ class GroundTruthConfig:
 
 
 @dataclass(frozen=True)
+class DrainageConfig:
+    """Rede de drenagem natural (cursos d'água), via GeoCuritiba / IPPUC.
+
+    Os nomes dos campos de paginação repetem os de ``StreetsConfig`` de
+    propósito: o cliente ArcGIS REST do ``acquire-streets`` é reaproveitado
+    sem adaptação.
+    """
+
+    source: str
+    service_url: str
+    layer_id: int
+    layer_name: str
+    source_crs: str
+    out_fields: list[str]
+    order_by_field: str
+    type_field: str
+    watercourse_type: int
+    covered_field: str
+    page_size: int
+    max_pages: int
+    request_timeout_s: float
+    max_retries: int
+    min_total_length_km: float
+    talweg_min_area_km2: float
+    dem_native_resolution_m: float
+    basins_file: str
+    basins_name_field: str
+
+    def __post_init__(self) -> None:
+        if self.talweg_min_area_km2 <= 0:
+            raise ConfigError("'drainage.talweg_min_area_km2' precisa ser > 0")
+        if self.dem_native_resolution_m <= 0:
+            raise ConfigError("'drainage.dem_native_resolution_m' precisa ser > 0")
+        if self.source != "geocuritiba":
+            raise ConfigError("'drainage.source': apenas 'geocuritiba' é implementado")
+        if not 1 <= self.page_size <= 2000:
+            raise ConfigError("'drainage.page_size' precisa estar em [1, 2000]")
+        for name in ("order_by_field", "type_field", "covered_field"):
+            value = getattr(self, name)
+            if value not in self.out_fields:
+                raise ConfigError(
+                    f"'drainage.{name}' ({value}) precisa estar em 'out_fields', "
+                    "senão o atributo não é baixado"
+                )
+        if self.min_total_length_km <= 0:
+            raise ConfigError("'drainage.min_total_length_km' precisa ser > 0")
+
+
+@dataclass(frozen=True)
+class NeighbourhoodsConfig:
+    """Divisa oficial de bairros (GeoCuritiba / IPPUC). Só agrega o resultado.
+
+    Os campos de paginação repetem os de ``StreetsConfig`` para reaproveitar o
+    mesmo cliente ArcGIS REST.
+    """
+
+    source: str
+    service_url: str
+    layer_id: int
+    layer_name: str
+    source_crs: str
+    out_fields: list[str]
+    order_by_field: str
+    name_field: str
+    page_size: int
+    max_pages: int
+    request_timeout_s: float
+    max_retries: int
+    expected_count: int
+    file: str
+
+    def __post_init__(self) -> None:
+        if self.source != "geocuritiba":
+            raise ConfigError("'neighbourhoods.source': apenas 'geocuritiba' é implementado")
+        if not 1 <= self.page_size <= 2000:
+            raise ConfigError("'neighbourhoods.page_size' precisa estar em [1, 2000]")
+        for name in ("order_by_field", "name_field"):
+            value = getattr(self, name)
+            if value not in self.out_fields:
+                raise ConfigError(
+                    f"'neighbourhoods.{name}' ({value}) precisa estar em 'out_fields'"
+                )
+        if self.expected_count < 1:
+            raise ConfigError("'neighbourhoods.expected_count' precisa ser >= 1")
+
+
+@dataclass(frozen=True)
 class TerrainConfig:
     dem_source: str
     url_template: str
@@ -618,6 +705,8 @@ class Config:
     sentinel: SentinelConfig
     ground_truth: GroundTruthConfig
     terrain: TerrainConfig
+    drainage: DrainageConfig
+    neighbourhoods: NeighbourhoodsConfig
     occurrences: OccurrencesConfig
     forecast: ForecastConfig
     risk_scenarios: RiskScenariosConfig
@@ -649,7 +738,8 @@ class Config:
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], root: Path, source: Path | None = None) -> Config:
         expected = {"project", "aoi", "boundary", "raster", "grid", "sentinel", "ground_truth",
-                    "terrain", "occurrences", "forecast", "risk_scenarios", "split",
+                    "terrain", "drainage", "neighbourhoods", "occurrences", "forecast",
+                    "risk_scenarios", "split",
                     "model", "evaluation", "tracking", "paths"}
         unknown = set(data) - expected
         if unknown:
@@ -697,6 +787,10 @@ class Config:
             sentinel=_build(SentinelConfig, data["sentinel"], "sentinel"),
             ground_truth=ground_truth,
             terrain=_build(TerrainConfig, data["terrain"], "terrain"),
+            drainage=_build(DrainageConfig, data["drainage"], "drainage"),
+            neighbourhoods=_build(
+                NeighbourhoodsConfig, data["neighbourhoods"], "neighbourhoods"
+            ),
             occurrences=_build(OccurrencesConfig, data["occurrences"], "occurrences"),
             forecast=_build(ForecastConfig, forecast_raw, "forecast"),
             risk_scenarios=_build(RiskScenariosConfig, scenarios_raw, "risk_scenarios"),

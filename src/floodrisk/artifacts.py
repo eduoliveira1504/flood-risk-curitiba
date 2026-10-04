@@ -14,13 +14,17 @@ from pathlib import Path
 from .config import Config
 
 __all__ = [
+    "basins",
     "boundary",
     "checkpoint",
     "dem",
+    "drainage",
+    "drainage_distance",
     "evaluation_report",
     "impervious_mask",
     "impervious_predicted",
     "impervious_probability",
+    "neighbourhoods",
     "normalisation",
     "osm_roads",
     "patch_footprints",
@@ -73,6 +77,29 @@ def dem(config: Config) -> Path:
 def slope(config: Config) -> Path:
     """Declividade em graus, derivada do DEM. Segundo eixo do índice de risco."""
     return config.path("data_interim") / "slope.tif"
+
+
+def basins(config: Config) -> Path:
+    """Bacias hidrográficas do município. Só agregam o resultado; não entram no índice."""
+    return (config.root / config.drainage.basins_file).resolve()
+
+
+def neighbourhoods(config: Config) -> Path:
+    """Divisa oficial de bairros. Só agrega o resultado; não entra no índice."""
+    return (config.root / config.neighbourhoods.file).resolve()
+
+
+def drainage(config: Config) -> Path:
+    """Cursos d'água do cadastro do IPPUC (GeoCuritiba), em CRS métrico."""
+    return config.path("data_interim") / "drainage.gpkg"
+
+
+def drainage_distance(config: Config) -> Path:
+    """Distância, em metros, de cada pixel ao curso d'água mais próximo.
+
+    Terceiro fator do índice de suscetibilidade. Na grade de referência.
+    """
+    return config.path("data_interim") / "drainage_distance.tif"
 
 
 def streets(config: Config) -> Path:

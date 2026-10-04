@@ -1,35 +1,60 @@
 """Índice de suscetibilidade a alagamento, na grade zonal de 200 m.
 
-O produto do TCC sai daqui. Duas camadas de 10 m entram — a impermeabilidade
-predita pela U-Net e a declividade derivada do DEM — e sai uma grade de células
-de 200 m com um índice contínuo e sua classificação.
+O produto do TCC sai daqui. Três camadas de 10 m entram — a impermeabilidade
+predita pela U-Net, a declividade derivada do DEM e a distância ao curso d'água
+mais próximo — e sai uma grade de células de 200 m com um índice contínuo e sua
+classificação.
 
-**A regra física.** Superfície impermeável determina quanta chuva vira
-escoamento em vez de infiltrar. Declividade determina se essa água fica ou
-desce. Alagamento acontece onde as duas condições se encontram: muita água
-gerada, pouca gravidade para levá-la embora. Impermeável em ladeira não alaga
-ali — transfere o problema para baixo. Permeável e plano absorve. Por isso o
-índice é o **produto**, e não a soma: soma deixaria uma célula íngreme e
-totalmente impermeável empatar com uma plana e semipermeável, que são situações
-fisicamente diferentes. No produto, um fator próximo de zero zera o resultado,
-que é o comportamento correto.
+    índice = impermeabilidade × retenção
+    retenção = √(planicidade × proximidade da drenagem)
+
+**A regra física.** Alagamento precisa de duas coisas ao mesmo tempo: água
+gerada e água que fica.
+
+- *Geração* é a impermeabilidade: quanto da chuva vira escoamento em vez de
+  infiltrar.
+- *Retenção* é o terreno, e ele tem duas leituras que não se substituem. A
+  **planicidade** (declividade invertida) diz se a água parada ali tem gravidade
+  para sair. A **proximidade da drenagem** diz se o entorno despeja água ali: a
+  rede de cursos d'água marca as linhas para onde o relevo converge. Um topo de
+  divisor plano e um fundo de vale plano têm a mesma declividade, e só o segundo
+  recebe a água dos outros.
+
+**Por que produto e não soma.** Soma deixaria uma célula íngreme e totalmente
+impermeável empatar com uma plana e semipermeável, que são situações
+fisicamente diferentes. No produto, um fator próximo de zero derruba o
+resultado, que é o comportamento correto.
+
+**Por que a raiz na retenção.** Planicidade e proximidade são duas medidas do
+MESMO fenômeno (a água fica), então dividem um único lugar na fórmula, pela
+média geométrica. Sem a raiz, o terreno entraria duas vezes e pesaria o dobro
+da superfície, sem que haja dado para justificar essa hierarquia. A média
+geométrica (e não a aritmética) mantém a regra do produto dentro do terreno:
+plano mas longe de qualquer drenagem, ou junto ao rio mas em encosta, não
+recebem retenção alta.
+
+**O que o índice mede — e o que não mede.** Mede ALAGAMENTO: acúmulo de água de
+chuva em área urbanizada por escoamento que não dá vazão. Não mede INUNDAÇÃO
+fluvial (o rio saindo da calha): margem de rio ocupada por parque tem
+impermeabilidade perto de zero e fica em classe baixa, o que é correto para
+alagamento e seria errado para inundação. O documento precisa usar o termo certo.
 
 **Por que percentil e não min–max.** A declividade máxima medida em Curitiba foi
 54,33°, contra p95 de 14,11° — cauda finíssima, produzida por borda de vale num
 DEM de 30 m reamostrado para 10 m. Normalizar por min–max entregaria a escala
-inteira do índice a esses poucos pixels de ruído: metade da cidade cairia na
-mesma faixa esmagada perto de zero. O percentil é insensível a isso por
-construção, e tem a leitura direta de "esta célula é mais plana que X% da
-cidade", que é o que um mapa municipal deve dizer.
+inteira do índice a esses poucos pixels de ruído. O percentil é insensível a
+isso por construção, e tem a leitura direta de "esta célula é mais plana (ou
+está mais perto da drenagem) que X% da cidade". Vale para os dois fatores de
+terreno.
 
 **O que este estágio deliberadamente NÃO faz.** Não multiplica o índice por um
 fator de chuva. Sem a base de ocorrências da Defesa Civil não existe como
 calibrar a relação entre acumulado e área efetivamente alagada, e qualquer peso
-inventado aqui ("crítica vale o dobro de forte") seria arbitrariedade disfarçada
-de modelo — justamente o que a escolha dos patamares pelo INMET eliminou. O
-índice é propriedade do TERRITÓRIO, estático; o cenário de chuva é exibido ao
-lado como contexto. Calibrar essa relação é o trabalho futuro que a ausência de
-dado impede hoje, e o documento deve dizer isso com essas palavras.
+inventado aqui seria arbitrariedade disfarçada de modelo. O índice é propriedade
+do TERRITÓRIO, estático; o cenário de chuva é exibido ao lado como contexto.
+Pelo mesmo motivo a forma da fórmula não é calibrada: é uma regra física com
+pesos iguais, e o estágio reporta quanto o mapa muda sob formulações
+alternativas para que essa escolha seja discutível com número.
 """
 
 from __future__ import annotations
@@ -48,6 +73,7 @@ __all__ = [
     "build",
     "classify",
     "percentile_rank",
+    "retention_factor",
     "susceptibility_index",
 ]
 
@@ -93,29 +119,42 @@ def percentile_rank(values):
     return (below + through) / (2 * array.size)
 
 
-def susceptibility_index(impervious, slope):
-    """Índice contínuo em [0, 1] a partir da impermeabilidade e da declividade.
+def retention_factor(slope, drainage_distance):
+    """Fator de retenção em (0, 1): média geométrica de planicidade e proximidade.
 
-    ``impervious`` já é probabilidade média na célula, então entra direto. A
-    declividade entra invertida — ``1 - percentil`` — porque plano é o que
-    agrava: a célula mais plana da cidade recebe fator ~1 e a mais íngreme ~0.
+    Os dois entram invertidos — ``1 - percentil`` — porque é o plano e o próximo
+    da drenagem que agravam.
+    """
+    import numpy as np
+
+    flatness = 1.0 - percentile_rank(slope)
+    proximity = 1.0 - percentile_rank(drainage_distance)
+    return np.sqrt(flatness * proximity)
+
+
+def susceptibility_index(impervious, slope, drainage_distance):
+    """Índice contínuo em [0, 1]: impermeabilidade × retenção do terreno.
+
+    ``impervious`` já é probabilidade média na célula, então entra direto.
     """
     import numpy as np
 
     impervious = np.asarray(impervious, dtype="float64")
     slope = np.asarray(slope, dtype="float64")
-    if impervious.shape != slope.shape:
+    drainage_distance = np.asarray(drainage_distance, dtype="float64")
+    if not (impervious.shape == slope.shape == drainage_distance.shape):
         raise SusceptibilityError(
-            f"impermeabilidade {impervious.shape} e declividade {slope.shape} "
-            "têm formas diferentes"
+            f"impermeabilidade {impervious.shape}, declividade {slope.shape} e "
+            f"distância à drenagem {drainage_distance.shape} têm formas diferentes"
         )
     if impervious.size == 0:
         raise SusceptibilityError("nenhuma célula para calcular o índice")
     if (impervious < 0).any() or (impervious > 1).any():
         raise SusceptibilityError("a impermeabilidade precisa estar em [0, 1]")
+    if (drainage_distance < 0).any():
+        raise SusceptibilityError("a distância à drenagem não pode ser negativa")
 
-    flatness = 1.0 - percentile_rank(slope)
-    return impervious * flatness
+    return impervious * retention_factor(slope, drainage_distance)
 
 
 def classify(index, labels=CLASS_LABELS):
@@ -153,11 +192,15 @@ def _zonal_means(config: Config, cells):
 
     probability_path = artifacts.impervious_probability(config)
     slope_path = artifacts.slope(config)
-    missing = [p for p in (probability_path, slope_path) if not p.exists()]
+    distance_path = artifacts.drainage_distance(config)
+    missing = [
+        p for p in (probability_path, slope_path, distance_path) if not p.exists()
+    ]
     if missing:
         names = ", ".join(config.display_path(p) for p in missing)
         raise SusceptibilityError(
-            f"insumo ausente: {names}. Rode 'infer' e 'build-terrain' antes."
+            f"insumo ausente: {names}. Rode 'infer', 'build-terrain' e "
+            "'build-drainage' antes."
         )
 
     with rasterio.open(probability_path) as source:
@@ -166,13 +209,15 @@ def _zonal_means(config: Config, cells):
         shape = (source.height, source.width)
         nodata = source.nodata
 
-    with rasterio.open(slope_path) as source:
-        slope = source.read(1)
-    if slope.shape != probability.shape:
-        raise SusceptibilityError(
-            "declividade e probabilidade estão em grades diferentes; "
-            "refaça 'build-terrain' e 'infer'."
-        )
+    layers = {}
+    for name, path in (("slope", slope_path), ("distance", distance_path)):
+        with rasterio.open(path) as source:
+            layers[name] = source.read(1)
+        if layers[name].shape != probability.shape:
+            raise SusceptibilityError(
+                f"{config.display_path(path)} está em grade diferente da "
+                "probabilidade; refaça o estágio que o produz."
+            )
 
     # 0 fica reservado para "fora de qualquer célula", então os índices começam
     # em 1 e o vetor de saída descarta a posição 0.
@@ -185,21 +230,22 @@ def _zonal_means(config: Config, cells):
         all_touched=False,
     )
 
-    valid = np.isfinite(probability) & np.isfinite(slope)
+    valid = np.isfinite(probability) & (zones > 0)
+    for layer in layers.values():
+        valid &= np.isfinite(layer)
     if nodata is not None:
         valid &= probability != nodata
-    valid &= zones > 0
 
     flat_zones = zones[valid].astype("int64")
-    count = np.bincount(flat_zones, minlength=len(cells) + 1)[1:]
-    total_probability = np.bincount(
-        flat_zones, weights=probability[valid].astype("float64"), minlength=len(cells) + 1
-    )[1:]
-    total_slope = np.bincount(
-        flat_zones, weights=slope[valid].astype("float64"), minlength=len(cells) + 1
-    )[1:]
+    size = len(cells) + 1
+    count = np.bincount(flat_zones, minlength=size)[1:]
 
-    return count, total_probability, total_slope
+    def total(layer):
+        return np.bincount(
+            flat_zones, weights=layer[valid].astype("float64"), minlength=size
+        )[1:]
+
+    return count, total(probability), total(layers["slope"]), total(layers["distance"])
 
 
 def build(config: Config) -> Path:
@@ -221,7 +267,7 @@ def build(config: Config) -> Path:
         aoi.area / 1e6,
     )
 
-    count, total_probability, total_slope = _zonal_means(config, cells)
+    count, total_probability, total_slope, total_distance = _zonal_means(config, cells)
 
     # Célula de borda pode ter só uma nesga dentro do dado válido; a média ali
     # seria de meia dúzia de pixels e não representa a célula.
@@ -245,8 +291,9 @@ def build(config: Config) -> Path:
     kept = [cell for cell, keep in zip(cells, enough, strict=True) if keep]
     impervious = total_probability[enough] / count[enough]
     slope = total_slope[enough] / count[enough]
+    distance = total_distance[enough] / count[enough]
 
-    index = susceptibility_index(impervious, slope)
+    index = susceptibility_index(impervious, slope, distance)
     position = classify(index)
 
     frame = gpd.GeoDataFrame(
@@ -254,7 +301,10 @@ def build(config: Config) -> Path:
             "cell_id": np.arange(len(kept)),
             "impervious_mean": np.round(impervious, 4),
             "slope_mean_deg": np.round(slope, 3),
+            "drainage_dist_m": np.round(distance, 1),
             "flatness": np.round(1.0 - percentile_rank(slope), 4),
+            "proximity": np.round(1.0 - percentile_rank(distance), 4),
+            "retention": np.round(retention_factor(slope, distance), 4),
             "susceptibility": np.round(index, 4),
             "class_index": position,
             "class_label": [CLASS_LABELS[p] for p in position],
@@ -262,6 +312,17 @@ def build(config: Config) -> Path:
         },
         geometry=kept,
         crs=config.project.crs_metric,
+    )
+
+    frame["basin"] = _zone_of(
+        frame, artifacts.basins(config), config.drainage.basins_name_field, "bacia", config
+    )
+    frame["neighbourhood"] = _zone_of(
+        frame,
+        artifacts.neighbourhoods(config),
+        "name",
+        "bairro",
+        config,
     )
 
     destination = artifacts.susceptibility_cells(config)
@@ -279,17 +340,74 @@ def build(config: Config) -> Path:
     return destination
 
 
+def _zone_of(frame, path: Path, field: str, label: str, config: Config):
+    """Nome da zona (bacia, bairro) que contém o centro de cada célula.
+
+    Atributo de agregação, não fator do índice: permite dizer "a bacia do Belém
+    tem X% das células na faixa mais alta". Sem o arquivo a coluna sai vazia e
+    o resto do pipeline segue igual.
+    """
+    import geopandas as gpd
+
+    if not path.exists():
+        logger.warning(
+            "%s ausente (%s): a grade fica sem esse resumo",
+            label,
+            config.display_path(path),
+        )
+        return None
+
+    zones = gpd.read_file(path)
+    if field not in zones.columns:
+        raise SusceptibilityError(
+            f"{config.display_path(path)} não tem o campo '{field}'"
+        )
+    if zones.crs is None:
+        raise SusceptibilityError(f"{config.display_path(path)} está sem CRS declarado")
+    zones = zones.to_crs(frame.crs)[[field, "geometry"]]
+
+    centres = gpd.GeoDataFrame(geometry=frame.geometry.centroid, crs=frame.crs)
+    joined = gpd.sjoin(centres, zones, how="left", predicate="within")
+    # Polígonos vizinhos podem se sobrepor num fio; fica o primeiro.
+    joined = joined[~joined.index.duplicated(keep="first")]
+    names = joined[field].reindex(frame.index)
+
+    summary = (
+        frame.assign(zone=names)
+        .groupby("zone")
+        .agg(
+            cells=("cell_id", "size"),
+            index=("susceptibility", "mean"),
+            top=("class_index", lambda s: (s == len(CLASS_LABELS) - 1).mean()),
+        )
+        .sort_values("top", ascending=False)
+    )
+    logger.info(
+        "por %s (células · índice médio · %% na faixa mais alta) — %d no total, "
+        "os primeiros:",
+        label,
+        len(summary),
+    )
+    for name, row in summary.head(10).iterrows():
+        logger.info(
+            "  %-28s %6d  %.3f  %5.1f%%", name, row["cells"], row["index"], 100 * row["top"]
+        )
+    return names.where(names.notna(), None)
+
+
 def _report(frame, config: Config) -> None:
     """Resumo por classe, mais a leitura que interessa ao documento."""
     import numpy as np
 
     logger.info(
-        "%-12s %8s %8s %14s %12s",
+        "%-12s %8s %7s %12s %12s %12s %14s",
         "classe",
         "células",
         "%",
         "impermeável",
         "declividade",
+        "dist. rio",
+        "a ≤100 m rio",
     )
     total = len(frame)
     for position, label in enumerate(CLASS_LABELS):
@@ -297,12 +415,14 @@ def _report(frame, config: Config) -> None:
         if selection.empty:
             continue
         logger.info(
-            "%-12s %8d %7.1f%% %13.1f%% %10.2f°",
+            "%-12s %8d %6.1f%% %11.1f%% %11.2f° %10.0f m %13.1f%%",
             label,
             len(selection),
             100 * len(selection) / total,
             100 * selection["impervious_mean"].mean(),
             selection["slope_mean_deg"].mean(),
+            selection["drainage_dist_m"].median(),
+            100 * (selection["drainage_dist_m"] <= 100).mean(),
         )
 
     top = frame[frame["class_index"] == len(CLASS_LABELS) - 1]
@@ -310,60 +430,124 @@ def _report(frame, config: Config) -> None:
         area_km2 = len(top) * (config.grid.cell_size_m**2) / 1e6
         logger.info(
             "classe mais alta: %.1f km² — %.0f%% impermeável, %.2f° de "
-            "declividade média",
+            "declividade média, %.0f m de distância mediana à drenagem",
             area_km2,
             100 * top["impervious_mean"].mean(),
             top["slope_mean_deg"].mean(),
+            top["drainage_dist_m"].median(),
         )
 
-    # Se a impermeabilidade e a declividade fossem redundantes entre si, o
-    # cruzamento não acrescentaria nada a um mapa de impermeabilidade puro.
-    correlation = np.corrcoef(frame["impervious_mean"], frame["slope_mean_deg"])[0, 1]
-    logger.info(
-        "correlação entre impermeabilidade e declividade: %+.3f (r² = %.3f)",
-        correlation,
-        correlation**2,
-    )
+    # Se os fatores fossem redundantes entre si, o cruzamento não acrescentaria
+    # nada a um mapa de impermeabilidade puro.
+    columns = {
+        "impermeabilidade": "impervious_mean",
+        "declividade": "slope_mean_deg",
+        "distância à drenagem": "drainage_dist_m",
+    }
+    names = list(columns)
+    for i, left in enumerate(names):
+        for right in names[i + 1 :]:
+            r = np.corrcoef(frame[columns[left]], frame[columns[right]])[0, 1]
+            logger.info("correlação %s × %s: %+.3f (r² = %.3f)", left, right, r, r**2)
 
-    _report_slope_contribution(frame)
+    _report_factor_contribution(frame)
+    _report_sensitivity(frame)
 
 
-def _report_slope_contribution(frame) -> None:
-    """Quanto a declividade muda o mapa, em número de células reclassificadas.
+def _class_shift(reference, combined) -> tuple[float, float]:
+    import numpy as np
+
+    shift = np.abs(np.asarray(reference) - np.asarray(combined))
+    return float((shift > 0).mean()), float((shift >= 2).mean())
+
+
+def _report_factor_contribution(frame) -> None:
+    """Quanto cada fator de terreno muda o mapa, em células reclassificadas.
 
     Responde à pergunta que a banca vai fazer: se o índice é dominado pela
     impermeabilidade, por que trazer o terreno? A resposta honesta não é "porque
-    a física diz" — é a contagem de células que mudam de classe quando o segundo
-    eixo entra. Se fosse perto de zero, o DEM e a declividade seriam trabalho
-    decorativo e o índice deveria ser simplificado.
+    a física diz" — é a contagem de células que mudam de classe quando o fator
+    entra. Se fosse perto de zero, o fator seria trabalho decorativo.
     """
-    import numpy as np
-
-    impervious_only = classify(frame["impervious_mean"].to_numpy())
+    impervious = frame["impervious_mean"].to_numpy()
+    flatness = frame["flatness"].to_numpy()
     combined = frame["class_index"].to_numpy()
 
-    shift = np.abs(impervious_only - combined)
-    moved = float((shift > 0).mean())
-    far = float((shift >= 2).mean())
+    impervious_only = classify(impervious)
+    without_drainage = classify(impervious * flatness)
 
+    moved, far = _class_shift(impervious_only, combined)
     logger.info(
-        "a declividade reclassifica %.1f%% das células em relação a um mapa de "
-        "impermeabilidade pura (%.1f%% mudam duas classes ou mais)",
+        "o terreno (declividade + drenagem) reclassifica %.1f%% das células em "
+        "relação a um mapa de impermeabilidade pura (%.1f%% mudam duas classes "
+        "ou mais)",
+        100 * moved,
+        100 * far,
+    )
+    moved, far = _class_shift(without_drainage, combined)
+    logger.info(
+        "a proximidade da drenagem reclassifica %.1f%% das células em relação ao "
+        "índice só com declividade (%.1f%% mudam duas classes ou mais)",
         100 * moved,
         100 * far,
     )
 
-    promoted = frame[impervious_only < combined]
-    demoted = frame[impervious_only > combined]
+    promoted = frame[without_drainage < combined]
+    demoted = frame[without_drainage > combined]
     if not promoted.empty:
         logger.info(
-            "  sobem de classe por serem planas: %d células, %.2f° de média",
+            "  sobem de classe por estarem junto à drenagem: %d células, %.0f m "
+            "de distância mediana",
             len(promoted),
-            promoted["slope_mean_deg"].mean(),
+            promoted["drainage_dist_m"].median(),
         )
     if not demoted.empty:
         logger.info(
-            "  descem por serem íngremes: %d células, %.2f° de média",
+            "  descem por estarem longe dela: %d células, %.0f m de distância "
+            "mediana",
             len(demoted),
-            demoted["slope_mean_deg"].mean(),
+            demoted["drainage_dist_m"].median(),
         )
+
+
+def _report_sensitivity(frame) -> None:
+    """Quanto o mapa depende da FORMA escolhida para combinar os fatores.
+
+    Sem ocorrências observadas não há como calibrar a fórmula; o que dá para
+    fazer é medir o quanto a classificação muda sob alternativas razoáveis. As
+    células que ficam na classe mais alta em todas elas são o resultado que não
+    depende da escolha.
+    """
+    import numpy as np
+
+    impervious = frame["impervious_mean"].to_numpy()
+    flatness = frame["flatness"].to_numpy()
+    proximity = frame["proximity"].to_numpy()
+    combined = frame["class_index"].to_numpy()
+    top_class = len(CLASS_LABELS) - 1
+
+    alternatives = {
+        "produto simples (imp × plan × prox)": impervious * flatness * proximity,
+        "média aritmética (imp × (plan + prox) / 2)": impervious
+        * (flatness + proximity)
+        / 2,
+    }
+    stable = combined == top_class
+    logger.info("sensibilidade à forma da fórmula:")
+    for name, index in alternatives.items():
+        position = classify(index)
+        moved, far = _class_shift(position, combined)
+        stable &= position == top_class
+        logger.info(
+            "  %-44s %5.1f%% das células em outra classe (%.1f%% a duas ou mais)",
+            name,
+            100 * moved,
+            100 * far,
+        )
+    logger.info(
+        "  células na classe mais alta nas três formulações: %d de %d (%.0f%%)",
+        int(stable.sum()),
+        int((combined == top_class).sum()),
+        100 * stable.sum() / max(int((combined == top_class).sum()), 1),
+    )
+    logger.debug("alternativas avaliadas: %s", np.array(list(alternatives)))

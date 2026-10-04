@@ -211,6 +211,72 @@ terrain:
   # 900 m. Recorte que devolva altitude de nível do mar é outro tile.
   expected_elevation_range_m: [700.0, 1200.0]
 
+drainage:
+  # Rede de drenagem natural: "Trecho de Drenagem" do cadastro do IPPUC.
+  # Entra no índice de suscetibilidade como PROXIMIDADE DA DRENAGEM — o fator
+  # que diz onde a água converge, e que a declividade sozinha não vê (topo de
+  # divisor plano e fundo de vale plano têm a mesma declividade).
+  #
+  # Trechos canalizados/cobertos (encoberto = 1) FICAM na rede de propósito: rio
+  # tampado continua sendo o caminho da água, e é onde a galeria afoga.
+  source: geocuritiba
+  service_url: "https://geocuritiba.ippuc.org.br/server/rest/services/GeoCuritiba/Publico_Interno_GeoCuritiba_BaseCartografica_para_MC/MapServer"
+  layer_id: 47
+  layer_name: "Trecho de Drenagem"
+  source_crs: EPSG:31982
+  out_fields: [objectid, nome, tipotrechodrenagem, encoberto, geometriaaproximada]
+  order_by_field: objectid
+  type_field: tipotrechodrenagem
+  # 4 = curso d'água. O tipo 5 (pluvial) existe na legenda mas veio vazio.
+  watercourse_type: 4
+  covered_field: encoberto
+  page_size: 2000          # teto do serviço
+  max_pages: 200
+  request_timeout_s: 120
+  max_retries: 3
+  # Rede de segurança contra download parcial: a hidrografia do IPPUC em linha
+  # (um subconjunto desta camada) já soma 555 km. Abaixo disso, faltou página.
+  min_total_length_km: 600.0
+  # Complemento pelo relevo. O cadastro não traz os rios que a cidade enterrou:
+  # há ~26 km² contínuos no centro sem nenhum trecho (Ivo, Juvevê, parte do
+  # Belém), embora as sub-bacias desses rios existam no próprio IPPUC. O
+  # 'build-drainage' soma à rede os TALVEGUES calculados do DEM — células com
+  # área de contribuição acima deste limiar.
+  #
+  # 1,0 km² não é número redondo escolhido a gosto: é o porte a partir do qual o
+  # IPPUC individualiza uma sub-bacia (1º quartil das 213 sub-bacias oficiais =
+  # 1,08 km²). Abaixo disso o DEM de 30 m passa a desenhar linha de fluxo que
+  # nenhum cadastro reconhece como curso d'água.
+  talweg_min_area_km2: 1.0
+  # Resolução nativa do Copernicus GLO-30. A análise de escoamento roda nela.
+  dem_native_resolution_m: 30.0
+  # Bacias hidrográficas de Curitiba (IPPUC Geodownloads, base Suderhsa 2011).
+  # NÃO entram no índice: servem para resumir o resultado por bacia no painel.
+  # Arquivo ausente não derruba nada — a grade só fica sem a coluna 'basin'.
+  basins_file: data/raw/hidrografia/bacias.gpkg
+  basins_name_field: NOME_BACIA
+
+neighbourhoods:
+  # Divisa oficial dos 75 bairros de Curitiba. NÃO entra no índice: serve para o
+  # painel dizer "quais bairros concentram a faixa mais alta", que é a unidade
+  # que qualquer morador reconhece.
+  source: geocuritiba
+  service_url: "https://geocuritiba.ippuc.org.br/server/rest/services/GeoCuritiba/Publico_GeoCuritiba_MapaCadastral/MapServer"
+  layer_id: 2
+  layer_name: "Bairro"
+  source_crs: EPSG:31982
+  out_fields: [objectid, nome, nm_regional]
+  order_by_field: objectid
+  name_field: nome
+  page_size: 2000
+  max_pages: 5
+  request_timeout_s: 120
+  max_retries: 3
+  # Curitiba tem 75 bairros (Decreto Municipal 774/1975). Menos que isso é
+  # download parcial.
+  expected_count: 75
+  file: data/raw/limites/bairros.gpkg
+
 occurrences:
   # ALVO SUPERVISIONADO — fonte ainda a definir (ver Fase 1).
   # Candidatos: chamados 156 da Prefeitura, Defesa Civil PR, CEMADEN.

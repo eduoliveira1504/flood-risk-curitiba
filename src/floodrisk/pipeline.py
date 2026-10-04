@@ -98,6 +98,27 @@ def _stage_acquire_dem(config: Config) -> None:
     dem.acquire(config)
 
 
+def _stage_acquire_drainage(config: Config) -> None:
+    """Baixa os cursos d'água do cadastro do município (GeoCuritiba / IPPUC)."""
+    from .acquisition import drainage
+
+    drainage.acquire(config)
+
+
+def _stage_acquire_neighbourhoods(config: Config) -> None:
+    """Baixa a divisa oficial de bairros (GeoCuritiba / IPPUC)."""
+    from .acquisition import neighbourhoods
+
+    neighbourhoods.acquire(config)
+
+
+def _stage_build_drainage(config: Config) -> None:
+    """Calcula a distância de cada pixel ao curso d'água mais próximo."""
+    from .features import drainage
+
+    drainage.build(config)
+
+
 def _stage_build_terrain(config: Config) -> None:
     """Deriva a declividade do DEM pelo método de Horn."""
     from .features import terrain
@@ -244,6 +265,18 @@ STAGES: tuple[Stage, ...] = (
         "Baixa e recorta o Copernicus DEM GLO-30",
         _stage_acquire_dem,
     ),
+    Stage(
+        "acquire-drainage",
+        1,
+        "Baixa os cursos d'água do município (GeoCuritiba/IPPUC, camada 47)",
+        _stage_acquire_drainage,
+    ),
+    Stage(
+        "acquire-neighbourhoods",
+        1,
+        "Baixa a divisa oficial de bairros (GeoCuritiba/IPPUC)",
+        _stage_acquire_neighbourhoods,
+    ),
     Stage("acquire-occurrences", 1, "Coleta e geocodifica ocorrências de alagamento"),
     Stage(
         "acquire-forecast",
@@ -263,6 +296,12 @@ STAGES: tuple[Stage, ...] = (
         2,
         "Deriva a declividade do DEM (Horn 3x3)",
         _stage_build_terrain,
+    ),
+    Stage(
+        "build-drainage",
+        2,
+        "Deriva a distância ao curso d'água mais próximo",
+        _stage_build_drainage,
     ),
     Stage(
         "make-dataset",

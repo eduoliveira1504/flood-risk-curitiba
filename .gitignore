@@ -135,3 +135,6 @@ cache/
 # neles e aplica a reinclusão.
 !site/data/*.geojson
 !docs/**/*.geojson
+
+/.quarto/
+**/*.quarto_ipynb
